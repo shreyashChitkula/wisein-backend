@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: wisein_dev
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wisein-backend:latest
+    restart: unless-stopped
+    ports:
+      - '3001:3001'
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/wisein_dev
+      PORT: 3001
+      NODE_ENV: production
+    depends_on:
+      - db
+    volumes:
+      - ./prisma:/app/prisma:ro
+
+volumes:
+  db_data:

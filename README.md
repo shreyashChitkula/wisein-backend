@@ -259,3 +259,33 @@ For issues or questions:
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+## Docker / Compose (optional)
+
+This backend includes a Dockerfile (`./Dockerfile`) and a `docker-compose.yml` in this folder that brings up a Postgres database and the backend service. This makes it easy to push just the `backend/` folder and run it in isolation.
+
+Quick start (from the `backend/` folder):
+
+```bash
+cd backend
+docker-compose up --build
+```
+
+What happens:
+- The `db` service (Postgres) is started and persisted to a Docker volume named `db_data`.
+- The `backend` service is built using the multistage `Dockerfile`. The build runs `npx prisma generate` and `npm run build` in the builder stage and the runtime image contains the compiled `dist` and generated Prisma client.
+
+Notes & next steps:
+- The compose file sets `DATABASE_URL` to point to the `db` service; edit `backend/docker-compose.yml` if you need different credentials.
+- Migrations are not automatically applied. After the database is available you can run migrations locally or from the container using:
+
+```bash
+# From host (recommended):
+npx prisma migrate deploy --preview-feature
+
+# OR run inside the backend container (after `docker-compose up`):
+docker-compose exec backend npx prisma migrate deploy --preview-feature
+```
+
+- If you change the Prisma schema, re-run `npx prisma generate` (or rebuild the image) so the generated client matches the schema.
+
