@@ -1,0 +1,190 @@
+### Wisein Backend API Collection
+### Last Updated: November 12, 2025
+### Status: ✅ All APIs Tested and Working
+
+@BASE_URL = http://localhost:3000
+@TEST_EMAIL = test.user@example.com
+@TEST_PASSWORD = SecurePass123!
+@TEST_NAME = Test User
+
+################################################################################
+# AUTHENTICATION ENDPOINTS
+################################################################################
+
+### 1️⃣ SIGNUP - Create new user account
+POST {{BASE_URL}}/auth/signup
+Content-Type: application/json
+
+{
+  "email": "newuser@example.com",
+  "password": "SecurePass123!",
+  "name": "New User"
+}
+
+### 2️⃣ SEND OTP - Request OTP resend
+POST {{BASE_URL}}/auth/send-otp
+Content-Type: application/json
+
+{
+  "email": "user@example.com"
+}
+
+### 3️⃣ VERIFY OTP - Verify email with OTP code
+POST {{BASE_URL}}/auth/verify-otp
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "otp": "123456"
+}
+
+### 4️⃣ LOGIN - User login with email and password
+POST {{BASE_URL}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "SecurePass123!"
+}
+
+### 5️⃣ REFRESH TOKEN - Get new access token
+POST {{BASE_URL}}/auth/refresh-token
+Content-Type: application/json
+
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+
+################################################################################
+# ONBOARDING FLOW ENDPOINTS
+################################################################################
+
+### 6️⃣ GET ONBOARDING STATUS - Check user's onboarding progress
+GET {{BASE_URL}}/auth/onboarding-status
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 7️⃣ SELECT COUNTRY - Choose country (determines verification method)
+POST {{BASE_URL}}/auth/select-country
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "country": "India"
+}
+
+################################################################################
+# ID VERIFICATION ENDPOINTS
+################################################################################
+
+### 8️⃣ GET VERIFICATION STATUS - Check current verification status
+GET {{BASE_URL}}/auth/verification/status
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 9️⃣ DIGILOCKER AUTHORIZE - Initiate DigiLocker OAuth flow
+POST {{BASE_URL}}/auth/digilocker/authorize
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 🔟 DIGILOCKER VERIFY - Verify with DigiLocker authorization code
+POST {{BASE_URL}}/auth/digilocker/verify
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "authorizationCode": "AUTH_CODE_FROM_DIGILOCKER"
+}
+
+### 1️⃣1️⃣ STRIPE IDENTITY SESSION - Create Stripe Identity verification session
+POST {{BASE_URL}}/auth/stripe-identity/create-session
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 1️⃣2️⃣ STRIPE IDENTITY VERIFY - Verify Stripe Identity session
+POST {{BASE_URL}}/auth/stripe-identity/verify
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "verificationSessionId": "VERIFICATION_SESSION_ID"
+}
+
+################################################################################
+# VIDEO VERIFICATION ENDPOINTS
+################################################################################
+
+### 1️⃣3️⃣ UPLOAD VIDEO - Upload video for verification (multipart form-data)
+POST {{BASE_URL}}/auth/upload-video
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### Uses: multipart/form-data with "video" field containing video file
+
+################################################################################
+# SUBSCRIPTION ENDPOINTS
+################################################################################
+
+### 1️⃣4️⃣ GET SUBSCRIPTION PLANS - View all available subscription plans
+GET {{BASE_URL}}/auth/subscription/plans
+
+### 1️⃣5️⃣ SELECT SUBSCRIPTION PLAN - Choose plan and create checkout session
+POST {{BASE_URL}}/auth/subscription/select-plan
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "planType": "INDIVIDUAL",
+  "planName": "Pro"
+}
+
+### 1️⃣6️⃣ GET CURRENT SUBSCRIPTION - Get active subscription details
+GET {{BASE_URL}}/auth/subscription/current
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 1️⃣7️⃣ CANCEL SUBSCRIPTION - Cancel current subscription
+POST {{BASE_URL}}/auth/subscription/cancel
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+################################################################################
+# WEBHOOK ENDPOINTS
+################################################################################
+
+### 1️⃣8️⃣ CASHFREE WEBHOOK - Handle Cashfree payment events
+POST {{BASE_URL}}/auth/webhooks/cashfree
+Content-Type: application/json
+
+{
+  "type": "PAYMENT_SUCCESS",
+  "data": {
+    "order_id": "order_123",
+    "payment_id": "payment_456"
+  }
+}
+
+################################################################################
+# ADMIN ENDPOINTS
+################################################################################
+
+### 1️⃣9️⃣ GET PENDING USERS - Admin: Get list of users awaiting approval
+GET {{BASE_URL}}/admin/pending-users
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 2️⃣0️⃣ APPROVE USER - Admin: Approve user verification
+POST {{BASE_URL}}/admin/users/:userId/approve
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+### 2️⃣1️⃣ REJECT USER - Admin: Reject user verification
+POST {{BASE_URL}}/admin/users/:userId/reject
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Content-Type: application/json
+
+{
+  "reason": "Rejection reason here"
+}
+
+### 2️⃣2️⃣ GET DASHBOARD STATS - Admin: Get dashboard statistics
+GET {{BASE_URL}}/admin/dashboard/stats
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+################################################################################
+# ROOT ENDPOINT
+################################################################################
+
+### 2️⃣3️⃣ HEALTH CHECK - Verify API is running
+GET {{BASE_URL}}/
