@@ -423,6 +423,36 @@ export class DigiLockerVerificationService {
         throw new NotFoundException('Verification session not found');
       }
 
+      // If the session is still INITIATED or PENDING, check with Cashfree
+      // so frontend polling can trigger the update. If Cashfree reports
+      // AUTHENTICATED we update the DB and return the updated status.
+      if (session.status === 'INITIATED' || session.status === 'PENDING') {
+        try {
+          const statusResult = await this.getDigiLockerVerificationStatus(
+            verificationId,
+          );
+
+          if (statusResult && statusResult.status === 'AUTHENTICATED') {
+            await this.prisma.digiLockerVerificationSession.update({
+              where: { verificationId },
+              data: { status: 'AUTHENTICATED' },
+            });
+
+            // return authenticated immediately
+            return {
+              status: 'AUTHENTICATED',
+              readyForComparison: true,
+            };
+          }
+          // If not authenticated yet, fall through and return DB status
+        } catch (err) {
+          // Don't fail the status endpoint if the external call fails.
+          this.logger.warn(
+            `Failed to refresh DigiLocker status from Cashfree for ${verificationId}: ${err.message}`,
+          );
+        }
+      }
+
       return {
         status: session.status,
         readyForComparison: session.status === 'AUTHENTICATED',

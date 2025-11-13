@@ -29,6 +29,7 @@ import {
   CreateCashfreeCheckoutSessionDto,
 } from './dtos';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { verifyCashfreeWebhookSignature } from '../utils/cashfree/webhook';
 
 @Controller('auth')
 export class AuthController {
@@ -488,6 +489,19 @@ export class AuthController {
    */
   @Post('webhooks/cashfree')
   async handleCashfreeWebhook(@Req() req) {
+    const signature = (req.headers['x-webhook-signature'] || req.headers['x-webhook-signature'.toLowerCase()]) as string | undefined;
+    const timestamp = (req.headers['x-webhook-timestamp'] || req.headers['x-webhook-timestamp'.toLowerCase()]) as string | undefined;
+    const rawBody = JSON.stringify(req.body || {});
+
+    // Verify webhook signature if secret configured
+    if (signature && timestamp) {
+      const ok = verifyCashfreeWebhookSignature(timestamp, rawBody, signature);
+      if (!ok) {
+        this.logger.warn('[webhooks/cashfree] Invalid signature, rejecting webhook');
+        return { received: false, reason: 'invalid_signature' };
+      }
+    }
+
     const event = req.body;
 
     switch (event.type) {

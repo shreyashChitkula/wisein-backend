@@ -260,32 +260,75 @@ For issues or questions:
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 
-## Docker / Compose (optional)
+## Docker / Compose (recommended for local testing)
 
-This backend includes a Dockerfile (`./Dockerfile`) and a `docker-compose.yml` in this folder that brings up a Postgres database and the backend service. This makes it easy to push just the `backend/` folder and run it in isolation.
+This backend includes a multistage `Dockerfile` and a `docker-compose.yml` in this folder. The compose file starts a Postgres database and the backend service (built from the `Dockerfile`). The builder stage runs `npx prisma generate` and builds the Nest app so the final image contains the compiled `dist` and generated Prisma client.
 
-Quick start (from the `backend/` folder):
+Prerequisites
+- Docker Engine (install from https://docs.docker.com/get-docker/)
+- docker-compose (Docker Desktop includes this; `docker compose` or `docker-compose` is fine)
+
+Quick start (run from the `backend/` folder)
 
 ```bash
-cd backend
+# Build and start in foreground (use -d to detach)
 docker-compose up --build
+
+# OR run detached
+docker-compose up --build -d
 ```
 
-What happens:
-- The `db` service (Postgres) is started and persisted to a Docker volume named `db_data`.
-- The `backend` service is built using the multistage `Dockerfile`. The build runs `npx prisma generate` and `npm run build` in the builder stage and the runtime image contains the compiled `dist` and generated Prisma client.
-
-Notes & next steps:
-- The compose file sets `DATABASE_URL` to point to the `db` service; edit `backend/docker-compose.yml` if you need different credentials.
-- Migrations are not automatically applied. After the database is available you can run migrations locally or from the container using:
+Using an env file
+If you prefer to keep secrets/config out of the compose file you can pass an env file:
 
 ```bash
-# From host (recommended):
-npx prisma migrate deploy --preview-feature
-
-# OR run inside the backend container (after `docker-compose up`):
-docker-compose exec backend npx prisma migrate deploy --preview-feature
+docker-compose --env-file .env up --build -d
 ```
 
-- If you change the Prisma schema, re-run `npx prisma generate` (or rebuild the image) so the generated client matches the schema.
+Check logs & status
+
+```bash
+# View backend logs
+docker-compose logs -f backend
+
+# See running containers
+docker ps
+
+# Stop and remove containers (preserves volume by default)
+docker-compose down
+
+# Stop and remove containers + volumes (clears DB data)
+docker-compose down -v
+```
+
+Apply database migrations (recommended)
+
+The compose file does not auto-apply migrations. After the DB is up, run migrations from your host (recommended) or inside the container:
+
+```bash
+# From host (recommended - uses your local prisma cli)
+npx prisma migrate deploy
+
+# Or inside the backend container (after `docker-compose up`):
+docker-compose exec backend npx prisma migrate deploy
+```
+
+Regenerate Prisma client
+
+If you change `prisma/schema.prisma` you must regenerate the Prisma client and rebuild the image. Locally:
+
+```bash
+npx prisma generate
+docker-compose build backend
+docker-compose up -d
+```
+
+Notes & production tips
+- The compose file in this folder is designed for local development and testing. For production deployments:
+   - Run migrations from CI or a separate migration job rather than on container startup.
+   - Use secrets or environment variable stores instead of checked-in `.env` files.
+   - Consider building the image in CI and pushing to a registry, then deploying the image.
+
+If you only push the `backend/` folder to a remote repo, the `Dockerfile`, `docker-compose.yml`, `prisma/` folder and `package.json` are all present so the image can be built using the same steps above.
+
 
