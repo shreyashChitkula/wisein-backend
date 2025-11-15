@@ -52,6 +52,18 @@ enum SubscriptionStatus {
   CANCELLED
 }
 
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum PaymentType {
+  ORDER
+  SUBSCRIPTION
+}
+
 enum JobApplicationStatus {
   APPLIED
   SHORTLISTED
@@ -101,6 +113,8 @@ model User {
   videoVerification  UserVideoVerification?
   videoVerificationSessions VideoVerificationSession[]
   subscription      Subscription?
+  orders            PaymentOrder[]
+  paymentRecords    PaymentRecord[]
   
   // Company
   ownedCompanies    Company[]
@@ -487,6 +501,70 @@ model Admin {
 // ============================================
 // TOKENS & SESSIONS
 // ============================================
+
+model PaymentOrder {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  orderId           String   @unique
+  paymentSessionId  String?
+  
+  amount            Float
+  currency          String   @default("INR")
+  
+  status            PaymentStatus @default(PENDING)
+  
+  // Cashfree metadata
+  cashfreeOrderId   String?
+  cashfreePaymentId String?
+  
+  // Customer details
+  customerPhone     String?
+  customerEmail     String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([orderId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model PaymentRecord {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  paymentType       PaymentType
+  
+  // References to order/subscription
+  orderId           String?
+  subscriptionId    String?
+  
+  // Payment details
+  amount            Float
+  currency          String   @default("INR")
+  status            PaymentStatus @default(PENDING)
+  
+  // Cashfree reference
+  cashfreeOrderId   String?
+  cashfreePaymentId String?
+  
+  // Webhook data
+  webhookPayload    Json?
+  
+  // Timestamps
+  paidAt            DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([paymentType])
+  @@index([status])
+  @@index([createdAt])
+}
 
 model RefreshToken {
   id        String   @id @default(cuid())
