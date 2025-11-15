@@ -8,9 +8,10 @@ import { DigiLockerModule } from './digilocker/digilocker.module';
 import { VideoVerificationModule } from './video-verification/video-verification.module';
 import { PrismaService } from './prisma/prisma.service';
 import { LoggingInterceptor } from './common/interceptors';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
-  imports: [AuthModule, AdminModule, DigiLockerModule, VideoVerificationModule],
+  imports: [AuthModule, AdminModule, DigiLockerModule, VideoVerificationModule, PaymentModule],
   controllers: [AppController],
   providers: [
     AppService,

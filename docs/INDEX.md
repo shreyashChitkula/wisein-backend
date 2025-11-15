@@ -65,7 +65,18 @@
 | POST | `/api/auth/subscription/cancel` | ✅ | Cancel subscription |
 | POST | `/api/auth/webhooks/cashfree` | ❌ | Payment webhook |
 
-### 6. Admin Operations (Admin Module) - 5 Endpoints
+### 6. Payment Processing (Payment Module) - 6 Endpoints ⭐ NEW
+
+| Method | Endpoint | Protected | Purpose |
+|--------|----------|-----------|---------|
+| POST | `/api/payment/order` | ✅ | Create payment order |
+| POST | `/api/payment/subscription` | ✅ | Create subscription |
+| GET | `/api/payment/status/:orderId` | ❌ | Get order status |
+| GET | `/api/payment/subscription/:userId` | ✅ | Check user subscription |
+| GET | `/api/payment/history/:userId` | ✅ | Get payment history |
+| POST | `/api/payment/webhook` | ❌ | Cashfree webhook |
+
+### 7. Admin Operations (Admin Module) - 5 Endpoints
 
 | Method | Endpoint | Protected | Purpose |
 |--------|----------|-----------|---------|
@@ -75,13 +86,13 @@
 | POST | `/api/admin/users/:id/reject` | ✅ | Reject user |
 | GET | `/api/admin/dashboard/stats` | ✅ | Dashboard statistics |
 
-### 7. System Endpoints - 1 Endpoint
+### 8. System Endpoints - 1 Endpoint
 
 | Method | Endpoint | Protected | Purpose |
 |--------|----------|-----------|---------|
 | GET | `/` | ❌ | Health check |
 
-**Total: 37 Endpoints across 5 modules**
+**Total: 43 Endpoints across 6 modules**
 
 ---
 
@@ -1104,6 +1115,11 @@ model User {
   videoVerified         Boolean     @default(false)
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
+  
+  // Relations
+  orders                PaymentOrder[]
+  paymentRecords        PaymentRecord[]
+  subscription          Subscription?
 }
 
 enum UserStatus {
@@ -1132,6 +1148,91 @@ model Subscription {
 }
 ```
 
+### Payment Models ⭐ NEW
+
+```prisma
+model PaymentOrder {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  orderId           String   @unique          # order_TIMESTAMP
+  paymentSessionId  String?
+  
+  amount            Float
+  currency          String   @default("INR")
+  status            PaymentStatus             # PENDING, SUCCESS, FAILED, CANCELLED
+  
+  customerPhone     String?
+  customerEmail     String?
+  
+  cashfreeOrderId   String?
+  cashfreePaymentId String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model PaymentRecord {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  paymentType       PaymentType               # ORDER or SUBSCRIPTION
+  
+  orderId           String?
+  subscriptionId    String?
+  
+  amount            Float
+  currency          String   @default("INR")
+  status            PaymentStatus
+  
+  cashfreeOrderId   String?
+  cashfreePaymentId String?
+  
+  webhookPayload    Json?                     # Full webhook data from Cashfree
+  paidAt            DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum PaymentType {
+  ORDER
+  SUBSCRIPTION
+}
+```
+
+---
+
+## Payment Flow
+
+```
+User Initiates Payment
+  ↓
+POST /api/payment/order (create order)
+  ↓ (Backend saves to DB with status=PENDING)
+  ↓
+Return payment URL (paymentUrl)
+  ↓
+Frontend redirects user to Cashfree payment page
+  ↓
+User completes payment
+  ↓
+Cashfree webhook calls POST /api/payment/webhook
+  ↓ (Backend verifies signature & updates DB status→SUCCESS)
+  ↓
+Frontend polls GET /api/payment/subscription/:userId
+  ↓
+Confirm payment & grant access to premium features
+```
+
 ---
 
 ## Testing
@@ -1154,6 +1255,16 @@ curl -X POST https://api.wisein.com/api/auth/select-country \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -d '{"country":"India"}'
+
+# Create Payment Order (with token)
+curl -X POST https://api.wisein.com/api/payment/order \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"amount":9999,"currency":"INR","phone":"9876543210"}'
+
+# Check Subscription Status (with token)
+curl https://api.wisein.com/api/payment/subscription/USER_ID \
+  -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 ### Using Postman
@@ -1164,6 +1275,8 @@ Import the collection: `API_COLLECTION.http`
 
 ## Reference Documentation
 
+- **Payment Integration Guide:** [PAYMENT_API.md](payment/PAYMENT_API.md) - Complete payment endpoint documentation
+- **Payment Frontend Integration:** [PAYMENT_FRONTEND_INTEGRATION.md](payment/PAYMENT_FRONTEND_INTEGRATION.md) - Step-by-step integration guide for frontend
 - **Complete Endpoint Reference:** [COMPLETE_API_REFERENCE.md](../COMPLETE_API_REFERENCE.md)
 - **User Journey:** [Complete Verification Flow](guides/COMPLETE_VERIFICATION_FLOW.md)
 - **DigiLocker Details:** [DigiLocker Documentation](digilocker/README.md)
@@ -1172,5 +1285,6 @@ Import the collection: `API_COLLECTION.http`
 ---
 
 **Last Updated:** November 13, 2025  
-**Version:** 2.0 - Complete API Reference  
-**Status:** ✅ All 37 endpoints documented and validated
+**Version:** 2.1 - Complete API + Payment Integration  
+**Status:** ✅ All 43 endpoints documented and validated
+
