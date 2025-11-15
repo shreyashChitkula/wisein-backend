@@ -21,6 +21,7 @@ import {
   VideoSessionStatus,
   CreateVideoVerificationDto,
 } from '../dtos/video-verification.dto';
+import { UserStatus } from '@prisma/client';
 
 /**
  * Video Verification Service
@@ -30,7 +31,6 @@ import {
 @Injectable()
 export class VideoVerificationService {
   private readonly logger = new Logger(VideoVerificationService.name);
-  private readonly SESSION_EXPIRY_MINUTES = 30; // 30 minutes to complete video
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -57,7 +57,7 @@ export class VideoVerificationService {
         throw new NotFoundException('User not found');
       }
 
-      if (user.status === 'VIDEO_VERIFIED') {
+      if (user.status === 'VIDEO_VERIFIED' || user.status === 'APPROVED') {
         this.logger.log(`User ${userId} already VIDEO_VERIFIED`);
         return {
           success: true,
@@ -72,7 +72,7 @@ export class VideoVerificationService {
         update: {
           photoUrl,
           videoUrl,
-          status: 'VERIFIED',
+          status: 'VIDEO_VERIFIED',
           verified: true,
           verifiedAt: new Date(),
         },
@@ -80,7 +80,7 @@ export class VideoVerificationService {
           userId,
           photoUrl,
           videoUrl,
-          status: 'VERIFIED',
+          status: 'VIDEO_VERIFIED',
           verified: true,
           verifiedAt: new Date(),
         },
@@ -247,8 +247,7 @@ export class VideoVerificationService {
 
   /**
    * Step 2: Submit Video for Verification
-   * User uploads video; system processes it for face detection and liveness
-   */
+   * User uploads
   // async submitVideoVerification(
   //   userId: string,
   //   dto: SubmitVideoVerificationDto,
