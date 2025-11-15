@@ -1,3 +1,8 @@
+// ============================================
+// TOKENS & SESSIONS
+// ============================================
+
+
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
@@ -442,27 +447,19 @@ model Admin {
 model PaymentOrder {
   id                String   @id @default(cuid())
   userId            String
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
   orderId           String   @unique
   paymentSessionId  String?
-  
   amount            Float
   currency          String   @default("INR")
-  
   status            PaymentStatus @default(PENDING)
-  
   // Cashfree metadata
   cashfreeOrderId   String?
   cashfreePaymentId String?
-  
   // Customer details
   customerPhone     String?
   customerEmail     String?
-  
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-  
   @@index([userId])
   @@index([orderId])
   @@index([status])
@@ -472,7 +469,6 @@ model PaymentOrder {
 model PaymentRecord {
   id                String   @id @default(cuid())
   userId            String
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   paymentType       PaymentType
   

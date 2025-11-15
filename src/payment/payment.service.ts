@@ -6,23 +6,27 @@ import { PrismaService } from '../prisma/prisma.service';
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
-  private apiKey = process.env.CASHFREE_API_KEY || '';
-  private apiSecret = process.env.CASHFREE_API_SECRET || '';
-  private baseUrl = process.env.CASHFREE_BASE_URL || 'https://api.cashfree.com/pg';
+  private apiKey = process.env.CASHFREE_API_KEY_PAYMENT || '';
+  private apiSecret = process.env.CASHFREE_API_SECRET_PAYMENT || '';
+  private baseUrl = process.env.CASHFREE_BASE_URL_PAYMENT || 'https://sandbox.cashfree.com/pg';
   private apiVersion = '2022-09-01';
 
   constructor(private readonly prisma: PrismaService) {}
 
   async createPaymentOrder(userId: string, amount: number, currency = 'INR', customerPhone?: string) {
+  // Debug: Print Cashfree credentials and endpoint
+  this.logger.log(`CASHFREE_API_KEY_PAYMENT: ${this.apiKey?.substring(0, 8)}...`);
+  this.logger.log(`CASHFREE_API_SECRET_PAYMENT: ${this.apiSecret?.substring(0, 8)}...`);
+  this.logger.log(`CASHFREE_BASE_URL_PAYMENT: ${this.baseUrl}`);
     try {
       // Ensure user has completed video verification before creating an order
-      const user = await this.prisma.user.findUnique({ where: { id: userId } });
-      if (!user) {
-        throw new BadRequestException('User not found');
-      }
-      if (user.status !== 'VIDEO_VERIFIED') {
-        throw new BadRequestException('User must complete video verification before making a payment');
-      }
+      // const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      // if (!user) {
+      //   throw new BadRequestException('User not found');
+      // }
+      // if (user.status !== 'VIDEO_VERIFIED') {
+      //   throw new BadRequestException('User must complete video verification before making a payment');
+      // }
       const orderId = `order_${Date.now()}`;
       const customerId = `customer_${Date.now()}`;
       const orderData = {
@@ -36,10 +40,10 @@ export class PaymentService {
           customer_name: 'Test Customer',
         },
         order_meta: {
-          return_url: process.env.CASHFREE_ENV === 'production'
+          return_url: process.env.CASHFREE_ENV_PAYMENT === 'production'
             ? `${process.env.FRONTEND_URL}/payment/success?order_id={order_id}`
             : `http://localhost:${process.env.PORT || 3000}/payment/success?order_id={order_id}`,
-          notify_url: process.env.CASHFREE_ENV === 'production' ? `${process.env.API_URL || 'https://wisein.in'}/api/payment/webhook` : undefined,
+          notify_url: process.env.CASHFREE_ENV_PAYMENT === 'production' ? `${process.env.API_URL || 'https://wisein.in'}/api/payment/webhook` : undefined,
         },
         order_note: 'Payment from backend',
       };
@@ -55,8 +59,8 @@ export class PaymentService {
       });
 
       const data = resp.data || {};
-      const isProduction = process.env.CASHFREE_ENV === 'production';
-      const paymentUrl = `https://payments${isProduction ? '' : '-test'}.cashfree.com/order/#${data.payment_session_id}`;
+      // Use payments.url from Cashfree response for redirect
+      const paymentUrl = data.payments?.url || '';
 
       // Save order to database
       await this.prisma.paymentOrder.create({
@@ -144,57 +148,6 @@ export class PaymentService {
     }
   }
 
-  async createSubscription(planId: string, customerId: string, customerPhone: string, amount: number, currency = 'INR') {
-    try {
-      // Ensure customer (user) is video verified before creating a subscription
-      // customerId may be an external id; try to resolve user by phone if available
-      // Here we assume the caller supplies a valid customerId mapping to a user; optionally check by phone
-      // If you maintain userId directly, consider changing signature to accept userId.
-      // As a minimal check, attempt to find a user by phone if provided in customerPhone
-      if (customerPhone) {
-        const user = await this.prisma.user.findFirst({ where: { phoneNumber: customerPhone } });
-        if (user && user.status !== 'VIDEO_VERIFIED') {
-          throw new BadRequestException('User must complete video verification before subscribing');
-        }
-      }
-      const subscriptionId = `sub_${Date.now()}`;
-      const subscriptionData = {
-        subscription_id: subscriptionId,
-        plan_id: planId,
-        customer_id: customerId,
-        customer_phone: customerPhone,
-        customer_email: 'test@example.com',
-        customer_name: 'Test Customer',
-        subscription_amount: amount,
-        subscription_currency: currency,
-        return_url: process.env.CASHFREE_ENV === 'production'
-          ? `${process.env.FRONTEND_URL}/payment/subscription-success?subscription_id={subscription_id}`
-          : `http://localhost:${process.env.PORT || 3000}/payment/subscription-success?subscription_id={subscription_id}`,
-        notify_url: process.env.CASHFREE_ENV === 'production' ? `${process.env.API_URL || 'https://wisein.in'}/api/auth/webhooks/cashfree` : undefined,
-      };
-
-      const resp = await axios.post(`${this.baseUrl}/subscriptions`, subscriptionData, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-client-id': this.apiKey,
-          'x-client-secret': this.apiSecret,
-          'x-api-version': this.apiVersion,
-        },
-      });
-
-      const data = resp.data || {};
-      return {
-        success: true,
-        subscriptionId,
-        payment_session_id: data.payment_session_id,
-        paymentUrl: data.authorization_url || data.authorizationUrl,
-        data,
-      };
-    } catch (error) {
-      this.logger.error('createSubscription error', error?.response?.data || error.message);
-      throw error;
-    }
-  }
 
   verifyWebhookSignature(timestamp: string, rawBody: string, signature: string) {
     try {
@@ -225,30 +178,6 @@ export class PaymentService {
     }
   }
 
-  /**
-   * Check if user has an active subscription
-   */
-  async checkUserSubscription(userId: string) {
-    try {
-      const subscription = await this.prisma.subscription.findUnique({
-        where: { userId },
-      });
-
-      if (!subscription) {
-        return { hasSubscription: false, subscription: null };
-      }
-
-      const isActive = subscription.status === 'ACTIVE' && subscription.endDate > new Date();
-
-      return {
-        hasSubscription: isActive,
-        subscription: isActive ? subscription : null,
-      };
-    } catch (error) {
-      this.logger.error('checkUserSubscription error', error);
-      throw error;
-    }
-  }
 
   /**
    * Get user's payment history

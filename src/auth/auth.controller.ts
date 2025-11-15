@@ -434,13 +434,18 @@ export class AuthController {
    * POST /auth/subscription/select-plan
    * Select subscription plan and create checkout session
    */
+  /**
+   * POST /auth/subscription/select-plan
+   * Select subscription plan by planId and create checkout session
+   * Input: { planId: string }
+   */
   @Post('subscription/select-plan')
   @UseGuards(JwtAuthGuard)
   async selectSubscriptionPlan(
     @Req() req,
-    @Body() planDto: SelectSubscriptionPlanDto,
+    @Body() body: { planId: string },
   ) {
-    return this.subscriptionService.createCheckoutSession(req.user.id, planDto);
+    return this.subscriptionService.createCheckoutSession(req.user.id, body);
   }
 
   /**

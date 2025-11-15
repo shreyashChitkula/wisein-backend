@@ -1,96 +1,67 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SelectSubscriptionPlanDto } from '../dtos';
+import { PaymentService } from '../../payment/payment.service';
 import axios from 'axios';
 
 @Injectable()
 export class SubscriptionService {
   private logger = new Logger(SubscriptionService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private paymentService: PaymentService,
+  ) {}
 
   async getAvailablePlans(): Promise<{ individualPlans: any[]; companyPlans: any[] }> {
     return {
       individualPlans: [
-        { id: 'price_individual_pro', name: 'Pro', price: 9.99, currency: 'USD', features: ['1:1 calls'] },
-        { id: 'price_individual_premium', name: 'Premium', price: 19.99, currency: 'USD', features: ['Unlimited 1:1 calls'] },
+        { id: 'ind_in_monthly', name: 'Individual India Monthly', price: 149, currency: 'INR', region: 'IN', billingCycle: 'monthly' },
+        { id: 'ind_in_yearly', name: 'Individual India Yearly', price: 1499, currency: 'INR', region: 'IN', billingCycle: 'yearly' },
+        { id: 'ind_int_monthly', name: 'Individual International Monthly', price: 9.99, currency: 'USD', region: 'INTL', billingCycle: 'monthly' },
+        { id: 'ind_int_yearly', name: 'Individual International Yearly', price: 99.99, currency: 'USD', region: 'INTL', billingCycle: 'yearly' }
       ],
       companyPlans: [
-        { id: 'price_company_startup', name: 'Startup', price: 49.99, currency: 'USD', features: ['Up to 5 job postings'] },
-        { id: 'price_company_enterprise', name: 'Enterprise', price: 199.99, currency: 'USD', features: ['Unlimited job postings'] },
-      ],
+        { id: 'comp_in_monthly', name: 'Company India Monthly', price: 499, currency: 'INR', region: 'IN', billingCycle: 'monthly' },
+        { id: 'comp_in_yearly', name: 'Company India Yearly', price: 4999, currency: 'INR', region: 'IN', billingCycle: 'yearly' },
+        { id: 'comp_int_monthly', name: 'Company International Monthly', price: 49.99, currency: 'USD', region: 'INTL', billingCycle: 'monthly' },
+        { id: 'comp_int_yearly', name: 'Company International Yearly', price: 499.99, currency: 'USD', region: 'INTL', billingCycle: 'yearly' }
+      ]
     };
   }
 
+
+  // Use payments module for payment operations
   async createCheckoutSession(
     userId: string,
-    planDto: SelectSubscriptionPlanDto,
+    planDto: { planId: string },
   ): Promise<{ orderId: string; paymentSessionId?: string; url: string; message: string }> {
-    const baseUrl = process.env.CASHFREE_BASE_URL || 'https://sandbox.cashfree.com/pg';
-    const apiKey = process.env.CASHFREE_API_KEY || '';
-    const apiSecret = process.env.CASHFREE_API_SECRET || '';
-    const apiVersion = '2022-09-01';
+    // Get plan details by planId
+    const plans = await this.getAvailablePlans();
+    const all = [...plans.individualPlans, ...plans.companyPlans];
+    const match = all.find((p) => p.id === planDto.planId);
+    if (!match) throw new BadRequestException('Invalid planId');
+    const orderAmount = match.price;
+    const currency = match.currency;
 
-    if (!apiKey || !apiSecret) {
-      this.logger.warn('Cashfree credentials missing; returning mock checkout URL');
-      const mockOrderId = `ORD_${Math.random().toString(36).substr(2, 9)}`;
-      return { orderId: mockOrderId, url: `https://checkout.cashfree.com/${mockOrderId}`, message: 'Mock checkout session (CASHFREE not configured)' };
-    }
+    // Call payments module to create payment order
+    const paymentResult = await this.paymentService.createPaymentOrder(
+      userId,
+      orderAmount,
+      currency,
+      undefined // customerPhone, if needed
+    );
 
-    const orderId = `order_${Date.now()}`;
-    // planDto coming from controller may not include amount. Prefer provided amount, else look up from available plans or fallback.
-    let orderAmount = 0;
-    if ((planDto as any).amount) {
-      orderAmount = Number((planDto as any).amount);
-    } else {
-      try {
-        const plans = await this.getAvailablePlans();
-        const all = [...plans.individualPlans, ...plans.companyPlans];
-        const match = all.find((p) => p.name === (planDto as any).planName || p.id === (planDto as any).planName);
-        orderAmount = match ? match.price : 149; // fallback amount (INR)
-      } catch (e) {
-        orderAmount = 149;
-      }
-    }
-    const isProduction = process.env.CASHFREE_ENV === 'production';
-
-    const returnUrl = process.env.FRONTEND_URL
-      ? `${process.env.FRONTEND_URL}/subscription-success?order_id={order_id}`
-      : `http://localhost:${process.env.PORT || 3000}/subscription-success?order_id={order_id}`;
-
-    const notifyUrl = `${process.env.API_URL || 'http://localhost:3000'}/api/auth/webhooks/cashfree`;
-
-    const orderData = {
-      order_id: orderId,
-      order_amount: orderAmount,
-  order_currency: (planDto as any).currency || 'INR',
-      customer_details: { customer_id: userId },
-      order_meta: { return_url: returnUrl, notify_url: notifyUrl },
-      order_note: `Subscription checkout for user ${userId}`,
+    return {
+      orderId: paymentResult.orderId,
+      paymentSessionId: paymentResult.payment_session_id,
+      url: paymentResult.paymentUrl,
+  message: 'Checkout session created successfully'
     };
-
-    try {
-      this.logger.log(`Creating Cashfree order ${orderId} amount=${orderAmount}`);
-      const resp = await axios.post(`${baseUrl}/orders`, orderData, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-client-id': apiKey,
-          'x-client-secret': apiSecret,
-          'x-api-version': apiVersion,
-        },
-      });
-
-      const data = resp.data || {};
-      const paymentSessionId = data.payment_session_id;
-      const paymentUrl = `https://payments${isProduction ? '' : '-test'}.cashfree.com/order/#${paymentSessionId}`;
-      return { orderId, paymentSessionId, url: paymentUrl, message: 'Checkout session created successfully' };
-    } catch (err) {
-      this.logger.error('Cashfree order creation failed', err?.response?.data || err.message);
-      const fallbackOrderId = `ORD_${Math.random().toString(36).substr(2, 9)}`;
-      return { orderId: fallbackOrderId, url: `https://checkout.cashfree.com/${fallbackOrderId}`, message: `Failed to create checkout session: ${err?.response?.data?.message || err.message}` };
-    }
   }
 
+
+  // On successful payment, add active subscription
   async handleSubscriptionSuccess(
     userId: string,
     cashfreeOrderId: string,
@@ -98,15 +69,18 @@ export class SubscriptionService {
     planType: string,
     planName: string,
   ): Promise<{ subscriptionId: string; message: string }> {
+    // Validate payment status using payments module
+    const paymentStatus = await this.paymentService.getPaymentStatus(cashfreeOrderId);
+    if (!paymentStatus.success || paymentStatus.status !== 'SUCCESS') {
+      throw new BadRequestException('Payment not successful');
+    }
     const endDate = new Date();
     endDate.setMonth(endDate.getMonth() + 1);
-
     const subscription = await this.prisma.subscription.upsert({
       where: { userId },
       update: { cashfreeOrderId, cashfreePaymentId, status: 'ACTIVE', startDate: new Date(), endDate, autoRenew: true },
       create: { userId, planType: planType as any, planName, cashfreeOrderId, cashfreePaymentId, status: 'ACTIVE', startDate: new Date(), endDate, autoRenew: true },
     });
-
     await this.prisma.user.update({ where: { id: userId }, data: { status: 'ACTIVE' } });
     return { subscriptionId: subscription.id, message: 'Subscription activated successfully. Welcome to the platform!' };
   }

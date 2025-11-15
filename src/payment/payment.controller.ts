@@ -18,36 +18,12 @@ export class PaymentController {
     return this.paymentService.createPaymentOrder(userId, amount, currency, phone);
   }
 
-  @Post('subscription')
-  @UseGuards(JwtAuthGuard)
-  async createSubscription(
-    @Req() req: any,
-    @Body()
-    body: {
-      planId: string;
-      customerId?: string;
-      phone?: string;
-      amount: number;
-      currency?: string;
-    },
-  ) {
-    const { planId, phone, amount, currency = 'INR' } = body;
-    const customerId: string = (body.customerId ?? `customer_${Date.now()}`) as string;
-    const phoneVal: string = phone ?? '';
-
-    return this.paymentService.createSubscription(planId, customerId, phoneVal, amount, currency);
-  }
 
   @Get('status/:orderId')
   async getStatus(@Param('orderId') orderId: string) {
     return this.paymentService.getPaymentStatus(orderId);
   }
 
-  @Get('subscription/:userId')
-  @UseGuards(JwtAuthGuard)
-  async checkSubscription(@Param('userId') userId: string) {
-    return this.paymentService.checkUserSubscription(userId);
-  }
 
   @Get('history/:userId')
   @UseGuards(JwtAuthGuard)
@@ -78,6 +54,6 @@ export class PaymentController {
     
     this.logger.log(`Webhook processed: ${JSON.stringify(result)}`);
 
-    return { success: result.processed };
+    return { success: true, result };
   }
 }

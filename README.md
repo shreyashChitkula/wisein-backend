@@ -199,11 +199,46 @@ See `.env.example` for complete configuration.
 - Video upload with frame extraction
 - Admin approval workflow
 
+
 ### Payments
-- Stripe checkout integration
-- Subscription management
+- Generic payment integration (Cashfree sandbox by default)
+- Payment order creation via API and UI
 - Webhook handling
-- Razorpay support (optional)
+- Stripe & Razorpay support (optional)
+
+## 🆕 Generic Payment Integration (Cashfree)
+
+The payment module is now generic and can be used anywhere in the app. Subscription logic has been removed.
+
+### Usage
+
+#### 1. Creating a Payment Order (API)
+
+Send a POST request to `/api/payment/order` with:
+```
+{
+   "amount": 1000,
+   "currency": "INR",
+   "phone": "9876543210"
+}
+```
+Authentication is currently disabled for testing. The backend uses a dummy userId.
+
+#### 2. Testing Payment via UI
+
+Open `http://localhost:3002/test-payment.html` in your browser. Fill in payment details and submit to test the payment flow.
+
+#### 3. Environment Variables
+
+Set these in `.env`:
+- `CASHFREE_API_KEY_PAYMENT`
+- `CASHFREE_API_SECRET_PAYMENT`
+- `CASHFREE_BASE_URL_PAYMENT`
+
+### Notes
+- Payment orders use Cashfree sandbox credentials.
+- The payment module is decoupled from business logic and reusable.
+- Re-enable authentication for production use.
 
 ## 📈 Deployment Checklist
 

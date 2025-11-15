@@ -9,6 +9,7 @@ import { SubscriptionService } from './services/subscription.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { PrismaService } from '../prisma/prisma.service';
 import { MailService } from '../shared/mail/mail.service';
+import { PaymentModule } from '../payment/payment.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { MailService } from '../shared/mail/mail.service';
       secret: process.env.JWT_SECRET || 'your-secret-key',
       signOptions: { expiresIn: '7d' },
     }),
+    PaymentModule,
   ],
   controllers: [AuthController],
   providers: [
