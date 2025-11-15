@@ -75,17 +75,17 @@ export class DigiLockerVerificationService {
         throw new BadRequestException('Please verify your email before starting ID verification');
       }
 
-      if (!user.country) {
-        throw new BadRequestException('Please select your country before starting ID verification');
-      }
+      // if (!user.country) {
+      //   throw new BadRequestException('Please select your country before starting ID verification');
+      // }
 
-      // Only allow Digilocker flow for users in India. Other users should use Stripe verification.
-      if (user.country && user.country.toLowerCase() !== 'india') {
-        this.logger.warn(`User ${userId} attempted DigiLocker init but country is ${user.country}`);
-        throw new BadRequestException(
-          'DigiLocker verification is available only for users in India. Please use Stripe verification for users outside India.',
-        );
-      }
+      // // Only allow Digilocker flow for users in India. Other users should use Stripe verification.
+      // if (user.country && user.country.toLowerCase() !== 'india') {
+      //   this.logger.warn(`User ${userId} attempted DigiLocker init but country is ${user.country}`);
+      //   throw new BadRequestException(
+      //     'DigiLocker verification is available only for users in India. Please use Stripe verification for users outside India.',
+      //   );
+      // }
 
       // Validate input
       if (!dto.mobileNumber || !/^\d{10}$/.test(dto.mobileNumber)) {

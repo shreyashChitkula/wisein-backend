@@ -17,6 +17,7 @@ import {
   SubmitVideoVerificationDto,
   AdminVerifyVideoDto,
   AdminRejectVideoDto,
+  CreateVideoVerificationDto,
 } from './dtos/video-verification.dto';
 
 interface Request extends ExpressRequest {
@@ -25,18 +26,50 @@ interface Request extends ExpressRequest {
     email?: string;
   };
 }
+interface AuthRequest extends Request {
+  user?: { id: string };
+}
 
-/**
- * Video Verification Controller
- * Handles video-based liveness detection and face matching for ID-verified users
- * Endpoints for initiating, submitting, and tracking video verification
- */
 @Controller('video-verification')
 @UseGuards(JwtAuthGuard)
 export class VideoVerificationController {
   private readonly logger = new Logger(VideoVerificationController.name);
 
   constructor(private readonly videoVerificationService: VideoVerificationService) {}
+
+  @Post('create')
+  async createVideoVerification(
+    @Body() dto: CreateVideoVerificationDto,
+    @Req() req: AuthRequest,
+    @Res() res: Response,
+  ) {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(HttpStatus.UNAUTHORIZED).json({
+        success: false,
+        message: 'Unauthorized',
+      });
+    }
+
+    const result = await this.videoVerificationService.createVideoVerification(dto, userId);
+    return res.status(HttpStatus.OK).json(result);
+  }
+
+  @Get('status')
+  async getStatus(@Req() req: AuthRequest, @Res() res: Response) {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(HttpStatus.UNAUTHORIZED).json({
+        success: false,
+        message: 'Unauthorized',
+      });
+    }
+
+    const result = await this.videoVerificationService.getVideoVerificationStatus(userId);
+    return res.status(HttpStatus.OK).json(result);
+  }
+
+
 
   /**
   * POST /video-verification/initiate
@@ -64,123 +97,123 @@ export class VideoVerificationController {
    * }
    * ```
    */
-  @Post('initiate')
-  async initiateVideoVerification(
-    @Body() dto: InitiateVideoVerificationDto,
-    @Req() req: Request,
-    @Res() res: Response,
-  ) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(HttpStatus.UNAUTHORIZED).json({
-          success: false,
-          message: 'User authentication required',
-        });
-      }
+  // @Post('initiate')
+  // async initiateVideoVerification(
+  //   @Body() dto: InitiateVideoVerificationDto,
+  //   @Req() req: Request,
+  //   @Res() res: Response,
+  // ) {
+  //   try {
+  //     const userId = req.user?.id;
+  //     if (!userId) {
+  //       return res.status(HttpStatus.UNAUTHORIZED).json({
+  //         success: false,
+  //         message: 'User authentication required',
+  //       });
+  //     }
 
-      const result = await this.videoVerificationService.initiateVideoVerification(
-        userId,
-        dto,
-      );
-      return res.status(HttpStatus.OK).json(result);
-    } catch (error) {
-      this.logger.error(`Error initiating video verification: ${error.message}`);
-      throw error;
-    }
-  }
+  //     const result = await this.videoVerificationService.initiateVideoVerification(
+  //       userId,
+  //       dto,
+  //     );
+  //     return res.status(HttpStatus.OK).json(result);
+  //   } catch (error) {
+  //     this.logger.error(`Error initiating video verification: ${error.message}`);
+  //     throw error;
+  //   }
+  // }
 
-  /**
-  * POST /video-verification/submit
-   * Submit video for verification
-   * 
-   * User submits recorded/captured video for verification
-   * Video URL should point to uploaded file (S3, CloudStorage, etc.)
-   * 
-   * **Request Body:**
-   * ```json
-   * {
-   *   "sessionId": "VID_1702650000000_ABC123",
-   *   "videoUrl": "https://storage.example.com/videos/abc123.mp4",
-   *   "videoDuration": 28,
-   *   "videoFormat": "mp4",
-   *   "videoSize": 5242880
-   * }
-   * ```
-   * 
-   * **Response (200 OK):**
-   * ```json
-   * {
-   *   "success": true,
-   *   "message": "Video submitted successfully",
-   *   "status": "PENDING",
-   *   "nextStatus": "Awaiting admin review"
-   * }
-   * ```
-   */
-  @Post('submit')
-  async submitVideoVerification(
-    @Body() dto: SubmitVideoVerificationDto,
-    @Req() req: Request,
-    @Res() res: Response,
-  ) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(HttpStatus.UNAUTHORIZED).json({
-          success: false,
-          message: 'User authentication required',
-        });
-      }
+  // /**
+  // * POST /video-verification/submit
+  //  * Submit video for verification
+  //  * 
+  //  * User submits recorded/captured video for verification
+  //  * Video URL should point to uploaded file (S3, CloudStorage, etc.)
+  //  * 
+  //  * **Request Body:**
+  //  * ```json
+  //  * {
+  //  *   "sessionId": "VID_1702650000000_ABC123",
+  //  *   "videoUrl": "https://storage.example.com/videos/abc123.mp4",
+  //  *   "videoDuration": 28,
+  //  *   "videoFormat": "mp4",
+  //  *   "videoSize": 5242880
+  //  * }
+  //  * ```
+  //  * 
+  //  * **Response (200 OK):**
+  //  * ```json
+  //  * {
+  //  *   "success": true,
+  //  *   "message": "Video submitted successfully",
+  //  *   "status": "PENDING",
+  //  *   "nextStatus": "Awaiting admin review"
+  //  * }
+  //  * ```
+  //  */
+  // @Post('submit')
+  // async submitVideoVerification(
+  //   @Body() dto: SubmitVideoVerificationDto,
+  //   @Req() req: Request,
+  //   @Res() res: Response,
+  // ) {
+  //   try {
+  //     const userId = req.user?.id;
+  //     if (!userId) {
+  //       return res.status(HttpStatus.UNAUTHORIZED).json({
+  //         success: false,
+  //         message: 'User authentication required',
+  //       });
+  //     }
 
-      const result = await this.videoVerificationService.submitVideoVerification(
-        userId,
-        dto,
-      );
-      return res.status(HttpStatus.OK).json(result);
-    } catch (error) {
-      this.logger.error(`Error submitting video: ${error.message}`);
-      throw error;
-    }
-  }
+  //     const result = await this.videoVerificationService.submitVideoVerification(
+  //       userId,
+  //       dto,
+  //     );
+  //     return res.status(HttpStatus.OK).json(result);
+  //   } catch (error) {
+  //     this.logger.error(`Error submitting video: ${error.message}`);
+  //     throw error;
+  //   }
+  // }
 
-  /**
-  * GET /video-verification/status
-   * Get /video verification status
-   * 
-   * Check current status of user's video verification
-   * 
-   * **Response (200 OK):**
-   * ```json
-   * {
-   *   "success": true,
-   *   "verified": false,
-   *   "status": "PENDING",
-   *   "message": "Your video is under review",
-   *   "nextSteps": [...]
-   * }
-   * ```
-   */
-  @Get('status')
-  async getVideoVerificationStatus(@Req() req: Request, @Res() res: Response) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(HttpStatus.UNAUTHORIZED).json({
-          success: false,
-          message: 'User authentication required',
-        });
-      }
+  // /**
+  // * GET /video-verification/status
+  //  * Get /video verification status
+  //  * 
+  //  * Check current status of user's video verification
+  //  * 
+  //  * **Response (200 OK):**
+  //  * ```json
+  //  * {
+  //  *   "success": true,
+  //  *   "verified": false,
+  //  *   "status": "PENDING",
+  //  *   "message": "Your video is under review",
+  //  *   "nextSteps": [...]
+  //  * }
+  //  * ```
+  //  */
+  // @Get('status')
+  // async getVideoVerificationStatus(@Req() req: Request, @Res() res: Response) {
+  //   try {
+  //     const userId = req.user?.id;
+  //     if (!userId) {
+  //       return res.status(HttpStatus.UNAUTHORIZED).json({
+  //         success: false,
+  //         message: 'User authentication required',
+  //       });
+  //     }
 
-      const result = await this.videoVerificationService.getVideoVerificationStatus(
-        userId,
-      );
-      return res.status(HttpStatus.OK).json(result);
-    } catch (error) {
-      this.logger.error(`Error getting status: ${error.message}`);
-      throw error;
-    }
-  }
+  //     const result = await this.videoVerificationService.getVideoVerificationStatus(
+  //       userId,
+  //     );
+  //     return res.status(HttpStatus.OK).json(result);
+  //   } catch (error) {
+  //     this.logger.error(`Error getting status: ${error.message}`);
+  //     throw error;
+  //   }
+  // }
 
   /**
   * POST /video-verification/admin/verify
@@ -208,31 +241,31 @@ export class VideoVerificationController {
    * }
    * ```
    */
-  @Post('admin/verify')
-  async adminVerifyVideo(
-    @Body() dto: AdminVerifyVideoDto,
-    @Req() req: Request,
-    @Res() res: Response,
-  ) {
-    try {
-      const adminId = req.user?.id;
-      if (!adminId) {
-        return res.status(HttpStatus.UNAUTHORIZED).json({
-          success: false,
-          message: 'Admin authentication required',
-        });
-      }
+  // @Post('admin/verify')
+  // async adminVerifyVideo(
+  //   @Body() dto: AdminVerifyVideoDto,
+  //   @Req() req: Request,
+  //   @Res() res: Response,
+  // ) {
+  //   try {
+  //     const adminId = req.user?.id;
+  //     if (!adminId) {
+  //       return res.status(HttpStatus.UNAUTHORIZED).json({
+  //         success: false,
+  //         message: 'Admin authentication required',
+  //       });
+  //     }
 
-      const result = await this.videoVerificationService.adminVerifyVideo(
-        adminId,
-        dto,
-      );
-      return res.status(HttpStatus.OK).json(result);
-    } catch (error) {
-      this.logger.error(`Error verifying video: ${error.message}`);
-      throw error;
-    }
-  }
+  //     const result = await this.videoVerificationService.adminVerifyVideo(
+  //       adminId,
+  //       dto,
+  //     );
+  //     return res.status(HttpStatus.OK).json(result);
+  //   } catch (error) {
+  //     this.logger.error(`Error verifying video: ${error.message}`);
+  //     throw error;
+  //   }
+  // }
 
   /**
   * POST /video-verification/admin/reject
@@ -257,33 +290,33 @@ export class VideoVerificationController {
    *   "status": "REJECTED",
    *   "rejectionReason": "Face not clearly visible"
    * }
-   * ```
-   */
-  @Post('admin/reject')
-  async adminRejectVideo(
-    @Body() dto: AdminRejectVideoDto,
-    @Req() req: Request,
-    @Res() res: Response,
-  ) {
-    try {
-      const adminId = req.user?.id;
-      if (!adminId) {
-        return res.status(HttpStatus.UNAUTHORIZED).json({
-          success: false,
-          message: 'Admin authentication required',
-        });
-      }
+  //  * ```
+  //  */
+  // @Post('admin/reject')
+  // async adminRejectVideo(
+  //   @Body() dto: AdminRejectVideoDto,
+  //   @Req() req: Request,
+  //   @Res() res: Response,
+  // ) {
+  //   try {
+  //     const adminId = req.user?.id;
+  //     if (!adminId) {
+  //       return res.status(HttpStatus.UNAUTHORIZED).json({
+  //         success: false,
+  //         message: 'Admin authentication required',
+  //       });
+  //     }
 
-      const result = await this.videoVerificationService.adminRejectVideo(
-        adminId,
-        dto,
-      );
-      return res.status(HttpStatus.OK).json(result);
-    } catch (error) {
-      this.logger.error(`Error rejecting video: ${error.message}`);
-      throw error;
-    }
-  }
+  //     const result = await this.videoVerificationService.adminRejectVideo(
+  //       adminId,
+  //       dto,
+  //     );
+  //     return res.status(HttpStatus.OK).json(result);
+  //   } catch (error) {
+  //     this.logger.error(`Error rejecting video: ${error.message}`);
+  //     throw error;
+  //   }
+  // }
 
   /**
   * GET /video-verification/admin/pending
@@ -309,38 +342,40 @@ export class VideoVerificationController {
    * }
    * ```
    */
-  @Get('admin/pending')
-  async adminGetPendingVideos(@Req() req: Request, @Res() res: Response) {
-    try {
-      const adminId = req.user?.id;
-      if (!adminId) {
-        return res.status(HttpStatus.UNAUTHORIZED).json({
-          success: false,
-          message: 'Admin authentication required',
-        });
-      }
+  // @Get('admin/pending')
+  // async adminGetPendingVideos(@Req() req: Request, @Res() res: Response) {
+  //   try {
+  //     const adminId = req.user?.id;
+  //     if (!adminId) {
+  //       return res.status(HttpStatus.UNAUTHORIZED).json({
+  //         success: false,
+  //         message: 'Admin authentication required',
+  //       });
+  //     }
 
-      const result = await this.videoVerificationService.adminGetPendingVideos(
-        adminId,
-      );
-      return res.status(HttpStatus.OK).json(result);
-    } catch (error) {
-      this.logger.error(`Error getting pending videos: ${error.message}`);
-      throw error;
-    }
-  }
+  //     const result = await this.videoVerificationService.adminGetPendingVideos(
+  //       adminId,
+  //     );
+  //     return res.status(HttpStatus.OK).json(result);
+  //   } catch (error) {
+  //     this.logger.error(`Error getting pending videos: ${error.message}`);
+  //     throw error;
+  //   }
+  // }
 
-  /**
-  * GET /video-verification/health
-   * Health check endpoint
-   */
-  @Get('health')
-  healthCheck(@Res() res: Response) {
-    return res.status(HttpStatus.OK).json({
-      success: true,
-      timestamp: new Date().toISOString(),
-      service: 'Video Verification',
-      status: 'operational',
-    });
-  }
+  // /**
+  // * GET /video-verification/health
+  //  * Health check endpoint
+  //  */
+  // @Get('health')
+  // healthCheck(@Res() res: Response) {
+  //   return res.status(HttpStatus.OK).json({
+  //     success: true,
+  //     timestamp: new Date().toISOString(),
+  //     service: 'Video Verification',
+  //     status: 'operational',
+  //   });
+  // }
+
+
 }

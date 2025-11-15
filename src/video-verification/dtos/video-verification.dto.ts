@@ -220,3 +220,8 @@ export class ProcessedVideoDataDto {
     notes?: string;
   };
 }
+
+export class CreateVideoVerificationDto {
+  photoUrl: string;
+  videoUrl: string;
+}
