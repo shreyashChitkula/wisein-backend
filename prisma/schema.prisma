@@ -78,49 +78,48 @@ enum CallStatus {
 // ============================================
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  username  String?  @unique  // unique username, optional for migration
-  passwordHash String?  // nullable for OAuth users
-  name      String?
-  country   String?
-  role      UserRole @default(INDIVIDUAL)
-  status    UserStatus @default(REGISTERED)
-  
-  profilePicUrl  String?
-  phoneNumber    String?
-  bio            String?
-  dateOfBirth    DateTime?
-  
+  id           String     @id @default(cuid())
+  email        String     @unique
+  username     String?    @unique // unique username, optional for migration
+  passwordHash String? // nullable for OAuth users
+  name         String?
+  country      String?
+  role         UserRole   @default(INDIVIDUAL)
+  status       UserStatus @default(REGISTERED)
+
+  profilePicUrl String?
+  phoneNumber   String?
+  bio           String?
+  dateOfBirth   DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  verification      UserVerification?
+  verification       UserVerification?
   digiLockerSessions DigiLockerVerificationSession[]
   videoVerification  UserVideoVerification?
-  videoVerificationSessions VideoVerificationSession[]
-  subscription      Subscription?
-  
+  subscription       Subscription?
+
   // Company
-  ownedCompanies    Company[]
-  
+  ownedCompanies Company[]
+
   // Posts & Engagement
-  posts             Post[]
-  engagements       Engagement[]
-  
+  posts       Post[]
+  engagements Engagement[]
+
   // Jobs
-  jobApplications   JobApplication[]
-  
+  jobApplications JobApplication[]
+
   // Calls
-  initiatedCalls    Call[] @relation("caller")
-  receivedCalls     Call[] @relation("receiver")
-  
+  initiatedCalls Call[] @relation("caller")
+  receivedCalls  Call[] @relation("receiver")
+
   // Admin
-  adminProfile      Admin?
-  
+  adminProfile Admin?
+
   // OTP verification
-  otpVerifications  OtpVerification[]
+  otpVerifications OtpVerification[]
 
   @@index([email])
   @@index([status])
@@ -128,30 +127,30 @@ model User {
 }
 
 model OtpVerification {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  otp       String
-  expiresAt DateTime
-  attempts  Int      @default(0)
-  isVerified Boolean @default(false)
-  
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  otp        String
+  expiresAt  DateTime
+  attempts   Int      @default(0)
+  isVerified Boolean  @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model UserVerification {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  method    VerificationMethod
-  idNumber  String?
-  
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  method   VerificationMethod
+  idNumber String?
+
   // DigiLocker specific fields
-  digilockerAccountId String? @unique  // Unique ID from DigiLocker
-  
+  digilockerAccountId String? @unique // Unique ID from DigiLocker
+
   // Identity document data (from DigiLocker or manual entry)
   nameAsPerAadhaar String?
   dateOfBirth      DateTime?
@@ -163,25 +162,25 @@ model UserVerification {
   phoneNumber      String?
   addressLine1     String?
   addressLine2     String?
-  
+
   // Comparison result
   comparisonResult Json?
-  
+
   // Verified data (JSON to support flexibility for different doc types)
   verifiedData Json?
-  
+
   // Video & Frame
-  videoUrl  String?
-  frameUrl  String?
-  
+  videoUrl String?
+  frameUrl String?
+
   // Status tracking
-  verified           Boolean @default(false)
+  verified           Boolean            @default(false)
   verificationStatus VerificationStatus @default(PENDING)
   verifiedAt         DateTime?
-  
+
   // Rejection reason (if applicable)
-  rejectionReason    String?
-  
+  rejectionReason String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -193,30 +192,26 @@ model UserVerification {
   @@index([digilockerAccountId])
 }
 
-// ============================================
-// DIGILOCKER VERIFICATION
-// ============================================
-
 model DigiLockerVerificationSession {
-  id                    String    @id @default(cuid())
-  verificationId        String    @unique
-  userId                String
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  userVerificationId    String?
-  userVerification      UserVerification? @relation(fields: [userVerificationId], references: [id], onDelete: Cascade)
-  
-  mobileNumber          String
-  digilockerAccountId   String?
-  
-  status                String    // INITIATED, AUTHENTICATED, PENDING, EXPIRED, CONSENT_DENIED
-  flowType              String    // signin, signup
-  
-  consentUrl            String?
+  id             String @id @default(cuid())
+  verificationId String @unique
+  userId         String
+  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  userVerificationId String?
+  userVerification   UserVerification? @relation(fields: [userVerificationId], references: [id], onDelete: Cascade)
+
+  mobileNumber        String
+  digilockerAccountId String?
+
+  status   String // INITIATED, AUTHENTICATED, PENDING, EXPIRED, CONSENT_DENIED
+  flowType String // signin, signup
+
+  consentUrl              String?
   webhookProvidedMobileNo String?
-  
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([verificationId])
@@ -224,113 +219,57 @@ model DigiLockerVerificationSession {
   @@index([createdAt])
 }
 
-// ============================================
-// VIDEO VERIFICATION
-// ============================================
-
 model UserVideoVerification {
-  id                      String    @id @default(cuid())
-  userId                  String    @unique
-  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Session reference
-  videoVerificationSessionId String?
-  videoVerificationSession   VideoVerificationSession? @relation(fields: [videoVerificationSessionId], references: [id], onDelete: SetNull)
-  
-  // Video metadata
-  videoUrl                String?   // S3 or storage URL
-  videoSize              Int?       // in bytes
-  videoDuration          Int?       // in seconds
-  videoFormat            String?    // mp4, webm, etc.
-  
-  // Face/Liveness detection
-  faceDetected           Boolean    @default(false)
-  livenessScore          Float?     // 0.0 to 1.0
-  faceMatchScore         Float?     // Comparison with DigiLocker photo
-  
-  // Verification status
-  status                 String     @default("PENDING")  // PENDING, VERIFIED, REJECTED, FAILED
-  verified               Boolean    @default(false)
-  verifiedAt             DateTime?
-  
-  // Admin review
-  verifiedBy             String?    // Admin user ID who verified
-  rejectionReason        String?    // Why verification was rejected
-  
-  // Comparison with DigiLocker
-  comparisonResult       Json?      // Face match details
-  
-  // Timestamps
-  createdAt              DateTime   @default(now())
-  updatedAt              DateTime   @updatedAt
-  
-  // Indexing
-  @@index([userId])
-  @@index([status])
-  @@index([verified])
-  @@index([createdAt])
-}
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-model VideoVerificationSession {
-  id                    String    @id @default(cuid())
-  sessionId             String    @unique  // Generate unique session ID
-  userId                String
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  // Session status
-  status                String    @default("INITIATED")  // INITIATED, RECORDING, SUBMITTED, PROCESSING, COMPLETED, EXPIRED
-  
-  // Session data
-  recordingUrl          String?
-  recordingDuration     Int?
-  
-  // Server-side recording (if applicable)
-  serverSideUrl         String?
-  
-  // Expiration
-  expiresAt             DateTime
-  
-  // Related verification
-  userVideoVerifications UserVideoVerification[]
-  
-  // Timestamps
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  
+  photoUrl String?
+  videoUrl String?
+
+  status          String    @default("PENDING")
+  verified        Boolean   @default(false)
+  verifiedAt      DateTime?
+  verifiedBy      String?
+  rejectionReason String?
+  adminNotes      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([userId])
-  @@index([sessionId])
   @@index([status])
   @@index([createdAt])
 }
 
 model Subscription {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  planType  SubscriptionPlanType
-  planName  String   // e.g., "Pro", "Enterprise"
-  
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  planType SubscriptionPlanType
+  planName String // e.g., "Pro", "Enterprise"
+
   startDate DateTime @default(now())
   endDate   DateTime
-  
-  status    SubscriptionStatus @default(ACTIVE)
-  
+
+  status SubscriptionStatus @default(ACTIVE)
+
   // Cashfree integration
-  cashfreeOrderId String?
+  cashfreeOrderId   String?
   cashfreePaymentId String?
-  
+
   // Razorpay integration (optional)
   razorpaySubscriptionId String?
-  
+
   // Auto-renewal
   autoRenew Boolean @default(true)
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  company   Company?
+  company Company?
 
   @@index([userId])
   @@index([status])
@@ -341,38 +280,38 @@ model Subscription {
 // ============================================
 
 model Company {
-  id        String   @id @default(cuid())
-  ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  
-  subscriptionId String @unique
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  subscriptionId String       @unique
   subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  
+
   name        String
   description String?
   website     String?
   verified    Boolean @default(false)
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  jobs      Job[]
+  jobs Job[]
 
   @@index([ownerId])
   @@index([verified])
 }
 
 model Job {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   companyId String
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   title       String
   description String
   location    String?
   salaryRange String?
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -383,16 +322,16 @@ model Job {
 }
 
 model JobApplication {
-  id        String   @id @default(cuid())
-  jobId     String
-  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  
+  id    String @id @default(cuid())
+  jobId String
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
   applicantId String
-  applicant   User     @relation(fields: [applicantId], references: [id], onDelete: Cascade)
-  
+  applicant   User   @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+
   resumeUrl String?
   status    JobApplicationStatus @default(APPLIED)
-  
+
   appliedAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -406,13 +345,13 @@ model JobApplication {
 // ============================================
 
 model Post {
-  id        String   @id @default(cuid())
-  authorId  String
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  
-  content   String
-  mediaUrl  String?
-  
+  id       String @id @default(cuid())
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  content  String
+  mediaUrl String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -424,16 +363,16 @@ model Post {
 }
 
 model Engagement {
-  id        String   @id @default(cuid())
-  postId    String
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  type      EngagementType
+  id     String @id @default(cuid())
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type        EngagementType
   commentText String?
-  
+
   createdAt DateTime @default(now())
 
   @@unique([postId, userId, type])
@@ -446,21 +385,21 @@ model Engagement {
 // ============================================
 
 model Call {
-  id        String   @id @default(cuid())
-  callerId  String
-  caller    User     @relation("caller", fields: [callerId], references: [id], onDelete: Cascade)
-  
+  id       String @id @default(cuid())
+  callerId String
+  caller   User   @relation("caller", fields: [callerId], references: [id], onDelete: Cascade)
+
   receiverId String
-  receiver   User     @relation("receiver", fields: [receiverId], references: [id], onDelete: Cascade)
-  
-  status    CallStatus @default(PENDING)
-  
-  callDuration Int?  // seconds
+  receiver   User   @relation("receiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  status CallStatus @default(PENDING)
+
+  callDuration Int? // seconds
   summaryText  String?
-  
+
   startedAt DateTime?
   endedAt   DateTime?
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -474,12 +413,12 @@ model Call {
 // ============================================
 
 model Admin {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  permissions Json?  // Store admin permissions as JSON
-  
+  id     String @id @default(cuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  permissions Json? // Store admin permissions as JSON
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -493,7 +432,7 @@ model RefreshToken {
   userId    String
   token     String   @unique
   expiresAt DateTime
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
