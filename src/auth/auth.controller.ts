@@ -24,7 +24,6 @@ import {
   VerifyOtpDto,
   SelectCountryDto,
   VerifyIdWithDigilockerDto,
-  VerifyIdWithStripeIdentityDto,
   SelectSubscriptionPlanDto,
   CreateCashfreeCheckoutSessionDto,
 } from './dtos';
@@ -345,31 +344,6 @@ export class AuthController {
     );
   }
 
-  /**
-   * POST /auth/stripe-identity/create-session
-   * Create Stripe Identity verification session
-   */
-  @Post('stripe-identity/create-session')
-  @UseGuards(JwtAuthGuard)
-  async createStripeIdentitySession(@Req() req) {
-    return this.verificationService.createStripeIdentitySession(req.user.id);
-  }
-
-  /**
-   * POST /auth/stripe-identity/verify
-   * Verify Stripe Identity session result
-   */
-  @Post('stripe-identity/verify')
-  @UseGuards(JwtAuthGuard)
-  async verifyStripeIdentity(
-    @Req() req,
-    @Body() stripeDto: VerifyIdWithStripeIdentityDto,
-  ) {
-    return this.verificationService.verifyStripeIdentitySession(
-      req.user.id,
-      stripeDto.verificationSessionId,
-    );
-  }
 
   /**
    * GET /auth/verification/status

@@ -69,6 +69,14 @@ export class DigiLockerVerificationController {
    * - 400: Invalid mobile number format
    * - 409: DigiLocker account already verified by another user
    * - 500: Internal server error
+   *
+   * **FRONTEND INTEGRATION NOTE:**
+   * After receiving the response, store `verificationId` in sessionStorage and redirect user to `consentUrl`:
+   * ```javascript
+   * const data = await response.json();
+   * sessionStorage.setItem('digilockerVerificationId', data.verificationId);
+   * window.location.href = data.consentUrl; // User will be redirected back to /digilocker/callback
+   * ```
    */
   @Post('initiate')
   async initiateVerification(
@@ -119,6 +127,162 @@ export class DigiLockerVerificationController {
    * **Error Responses:**
    * - 400: Invalid verification ID
    * - 500: Processing error
+   *
+   * **FRONTEND INTEGRATION GUIDE:**
+   * 
+   * After DigiLocker completes verification, it redirects to: `${FRONTEND_URL}/digilocker/callback`
+   * 
+   * **Step 1: Create a callback page/route**
+   * Create a page at `/digilocker/callback` in your frontend (React/Vue/Angular)
+   * 
+   * **Step 2: Handle the redirect in your callback page**
+   * ```javascript
+   * // Example: React component for /digilocker/callback
+   * import { useEffect, useState } from 'react';
+   * import { useSearchParams, useNavigate } from 'react-router-dom';
+   * 
+   * function DigiLockerCallback() {
+   *   const [searchParams] = useSearchParams();
+   *   const navigate = useNavigate();
+   *   const [status, setStatus] = useState('processing');
+   *   const [message, setMessage] = useState('Processing DigiLocker response...');
+   * 
+   *   useEffect(() => {
+   *     handleCallback();
+   *   }, []);
+   * 
+   *   async function handleCallback() {
+   *     try {
+   *       // Get verificationId from URL params (DigiLocker may send it)
+   *       // OR from sessionStorage (stored when initiating verification)
+   *       const verificationId = searchParams.get('verification_id') 
+   *                          || sessionStorage.getItem('digilockerVerificationId');
+   * 
+   *       if (!verificationId) {
+   *         setStatus('error');
+   *         setMessage('Verification session not found. Please start over.');
+   *         setTimeout(() => navigate('/verify'), 3000);
+   *         return;
+   *       }
+   * 
+   *       // Get auth token
+   *       const token = localStorage.getItem('authToken');
+   *       if (!token) {
+   *         setStatus('error');
+   *         setMessage('Please login to continue');
+   *         setTimeout(() => navigate('/login'), 2000);
+   *         return;
+   *       }
+   * 
+   *       // Call backend callback endpoint
+   *       const response = await fetch('http://localhost:3000/api/digilocker/callback', {
+   *         method: 'POST',
+   *         headers: {
+   *           'Authorization': `Bearer ${token}`,
+   *           'Content-Type': 'application/json'
+   *         },
+   *         body: JSON.stringify({ verificationId })
+   *       });
+   * 
+   *       const data = await response.json();
+   * 
+   *       if (!response.ok || !data.success) {
+   *         setStatus('error');
+   *         setMessage(data.message || 'DigiLocker authentication failed');
+   *         setTimeout(() => navigate('/verify'), 3000);
+   *         return;
+   *       }
+   * 
+   *       // Check if ready for data comparison
+   *       if (data.status === 'AUTHENTICATED' && data.readyForComparison) {
+   *         setStatus('success');
+   *         setMessage('DigiLocker authenticated! Redirecting to data entry...');
+   *         
+   *         // Redirect to data entry form after 1.5 seconds
+   *         setTimeout(() => {
+   *           navigate('/verify/enter-data', { 
+   *             state: { verificationId } 
+   *           });
+   *         }, 1500);
+   *       } else {
+   *         setStatus('error');
+   *         setMessage('Verification incomplete. Please try again.');
+   *         setTimeout(() => navigate('/verify'), 3000);
+   *       }
+   * 
+   *     } catch (error) {
+   *       setStatus('error');
+   *       setMessage(`Error: ${error.message}`);
+   *       setTimeout(() => navigate('/verify'), 3000);
+   *     }
+   *   }
+   * 
+   *   return (
+   *     <div className="callback-container">
+   *       {status === 'processing' && (
+   *         <div>
+   *           <div className="spinner"></div>
+   *           <p>{message}</p>
+   *         </div>
+   *       )}
+   *       {status === 'success' && (
+   *         <div className="success">
+   *           <p>✓ {message}</p>
+   *         </div>
+   *       )}
+   *       {status === 'error' && (
+   *         <div className="error">
+   *           <p>✗ {message}</p>
+   *         </div>
+   *       )}
+   *     </div>
+   *   );
+   * }
+   * ```
+   * 
+   * **Step 3: Store verificationId when initiating verification**
+   * ```javascript
+   * // When calling POST /api/digilocker/initiate
+   * async function startDigiLockerVerification(mobileNumber) {
+   *   const response = await fetch('/api/digilocker/initiate', {
+   *     method: 'POST',
+   *     headers: {
+   *       'Authorization': `Bearer ${token}`,
+   *       'Content-Type': 'application/json'
+   *     },
+   *     body: JSON.stringify({ mobileNumber })
+   *   });
+   * 
+   *   const data = await response.json();
+   *   
+   *   // Store verificationId for callback page
+   *   sessionStorage.setItem('digilockerVerificationId', data.verificationId);
+   *   
+   *   // Redirect user to DigiLocker
+   *   window.location.href = data.consentUrl;
+   * }
+   * ```
+   * 
+   * **Step 4: Handle URL parameters (optional)**
+   * DigiLocker may append query parameters to the redirect URL:
+   * - `verification_id`: The verification ID
+   * - `status`: Verification status
+   * - `error`: Error message (if any)
+   * 
+   * Extract these from the URL:
+   * ```javascript
+   * const urlParams = new URLSearchParams(window.location.search);
+   * const verificationId = urlParams.get('verification_id');
+   * const status = urlParams.get('status');
+   * const error = urlParams.get('error');
+   * ```
+   * 
+   * **Important Notes:**
+   * - The redirect URI is configured in the backend: `${FRONTEND_URL}/digilocker/callback`
+   * - Make sure `FRONTEND_URL` environment variable is set correctly
+   * - The callback page must be accessible without authentication (or handle auth redirect)
+   * - Always validate the verificationId before calling the backend
+   * - Clear sessionStorage after successful verification
    */
   @Post('callback')
   async processCallback(

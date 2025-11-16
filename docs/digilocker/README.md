@@ -1,8 +1,8 @@
 # DigiLocker Verification - Complete Documentation
 
 **Status:** Production Ready ✅  
-**Last Updated:** November 13, 2025  
-**Version:** 1.0
+**Last Updated:** November 16, 2025  
+**Version:** 2.0
 
 ---
 
@@ -11,10 +11,11 @@
 1. [Quick Start](#quick-start)
 2. [Overview](#overview)
 3. [API Reference](#api-reference)
-4. [Implementation Details](#implementation-details)
-5. [Testing Guide](#testing-guide)
-6. [Troubleshooting](#troubleshooting)
-7. [FAQ](#faq)
+4. [Frontend Integration](#frontend-integration)
+5. [Implementation Details](#implementation-details)
+6. [Testing Guide](#testing-guide)
+7. [Troubleshooting](#troubleshooting)
+8. [FAQ](#faq)
 
 ---
 
@@ -29,6 +30,7 @@
   - `CASHFREE_API_SECRET`
   - `CASHFREE_BASE_URL` (sandbox or production)
   - `CASHFREE_PUBLIC_KEY`
+  - `FRONTEND_URL` (for redirect URI)
 
 ### Complete Flow (7 Steps)
 
@@ -55,8 +57,8 @@ http POST http://localhost:3000/api/digilocker/initiate \
   Authorization:"Bearer YOUR_TOKEN" \
   mobileNumber=9876543210
 
-# 6. Open consentUrl in browser, complete DigiLocker auth
-# (This is done by user in browser)
+# 6. User completes DigiLocker auth in browser
+# (Redirects back to ${FRONTEND_URL}/digilocker/callback)
 
 # 7. Callback after authentication
 http POST http://localhost:3000/api/digilocker/callback \
@@ -80,6 +82,7 @@ DigiLocker is an Aadhaar-based digital locker service by the Government of India
 - Verify identity using their Aadhaar
 - Link Aadhaar data with their account
 - Ensure data matches before completion
+- **Automatic redirect back to your webpage after completion**
 
 ### Architecture
 
@@ -97,10 +100,12 @@ DigiLocker is an Aadhaar-based digital locker service by the Government of India
          ▼
 ┌──────────────────────────┐
 │ DigiLocker Verification  │
-│  (This flow)             │
 │  • Initiate              │
-│  • Authenticate          │
-│  • Complete              │
+│  • Redirect to DigiLocker│
+│  • User authenticates     │
+│  • Redirects back to app  │
+│  • Callback processing    │
+│  • Complete with data    │
 └────────┬─────────────────┘
          │
          ▼
@@ -120,7 +125,7 @@ DigiLocker is an Aadhaar-based digital locker service by the Government of India
 
 ### 1. **POST** `/api/digilocker/initiate`
 
-Initiates DigiLocker verification flow.
+Initiates DigiLocker verification flow and generates consent URL with redirect URI.
 
 **Request:**
 ```json
@@ -141,10 +146,15 @@ Initiates DigiLocker verification flow.
 }
 ```
 
+**Important:** 
+- Store `verificationId` in sessionStorage before redirecting
+- Redirect user to `consentUrl`
+- After DigiLocker completion, user will be redirected to `${FRONTEND_URL}/digilocker/callback`
+
 **Error Responses:**
 | Status | Error |
 |--------|-------|
-| 400 | Invalid mobile number or user not ID verified |
+| 400 | Invalid mobile number or user not email verified |
 | 400 | User country not India |
 | 409 | DigiLocker account already verified |
 | 500 | Cashfree API error |
@@ -153,7 +163,7 @@ Initiates DigiLocker verification flow.
 
 ### 2. **POST** `/api/digilocker/callback`
 
-Process callback after user authenticates in DigiLocker.
+Process callback after user authenticates in DigiLocker and is redirected back.
 
 **Request:**
 ```json
@@ -179,6 +189,9 @@ Process callback after user authenticates in DigiLocker.
 | PENDING | Still authenticating |
 | EXPIRED | Session expired (>24 hours) |
 | CONSENT_DENIED | User rejected document sharing |
+
+**Frontend Integration:**
+See [Frontend Integration](#frontend-integration) section below for complete React/Vue/Angular examples.
 
 ---
 
@@ -268,7 +281,7 @@ Health check endpoint.
 ```json
 {
   "success": true,
-  "timestamp": "2025-11-13T23:00:00.000Z",
+  "timestamp": "2025-11-16T23:00:00.000Z",
   "service": "DigiLocker Verification",
   "status": "operational"
 }
@@ -276,7 +289,228 @@ Health check endpoint.
 
 ---
 
+## Frontend Integration
+
+### Step 1: Create Callback Page
+
+Create a page at `/digilocker/callback` in your frontend. This is where DigiLocker will redirect users after completion.
+
+**React Example:**
+```javascript
+import { useEffect, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+
+function DigiLockerCallback() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [status, setStatus] = useState('processing');
+  const [message, setMessage] = useState('Processing DigiLocker response...');
+
+  useEffect(() => {
+    handleCallback();
+  }, []);
+
+  async function handleCallback() {
+    try {async processCallback(
+    userId: string,
+    dto: ProcessDigiLockerCallbackDto,
+  ): Promise<DigiLockerCallbackResponseDto> {
+    this.logger.log(
+      `Processing DigiLocker callback for user: ${userId}, verification: ${dto.verificationId}`,
+    );
+
+    try {
+      // Ensure caller is eligible for DigiLocker (India-only)
+      const caller = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!caller) throw new BadRequestException('User not found');
+      if (caller.country && caller.country.toLowerCase() !== 'india') {
+        this.logger.warn(`User ${userId} attempted DigiLocker callback but country is ${caller.country}`);
+        throw new BadRequestException(
+          'DigiLocker verification is available only for users in India. Please use Stripe verification for users outside India.',
+        );
+      }
+
+      // Get verification session
+      const session = await this.prisma.digiLockerVerificationSession.findUnique({
+        where: { verificationId: dto.verificationId },
+      });
+
+      if (!session || session.userId !== userId) {
+        throw new BadRequestException('Invalid verification session');
+      }
+
+      // Check status with Cashfree
+      const statusResult = await this.getDigiLockerVerificationStatus(
+        dto.verificationId,
+      );
+
+      // Update session status
+      await this.prisma.digiLockerVerificationSession.update({
+        where: { verificationId: dto.verificationId },
+        data: {
+          status:
+            statusResult.status === 'AUTHENTICATED'
+              ? 'AUTHENTICATED'
+              : 'PENDING',
+        },
+      });
+
+      return {
+        success: statusResult.status === 'AUTHENTICATED',
+        status: statusResult.status as VerificationStatus,
+        readyForComparison: statusResult.status === 'AUTHENTICATED',
+        message:
+          statusResult.status === 'AUTHENTICATED'
+            ? 'DigiLocker verification successful. Ready for comparison.'
+            : 'Verification still pending.',
+      };
+    } catch (error) {
+      this.logger.error(`Error processing callback: ${error.message}`);
+      throw error;
+    }
+  }
+      // Get verificationId from URL params OR sessionStorage
+      const verificationId = searchParams.get('verification_id') 
+                         || sessionStorage.getItem('digilockerVerificationId');
+
+      if (!verificationId) {
+        setStatus('error');
+        setMessage('Verification session not found. Please start over.');
+        setTimeout(() => navigate('/verify'), 3000);
+        return;
+      }
+
+      // Get auth token
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setStatus('error');
+        setMessage('Please login to continue');
+        setTimeout(() => navigate('/login'), 2000);
+        return;
+      }
+
+      // Call backend callback endpoint
+      const response = await fetch('http://localhost:3000/api/digilocker/callback', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ verificationId })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        setStatus('error');
+        setMessage(data.message || 'DigiLocker authentication failed');
+        setTimeout(() => navigate('/verify'), 3000);
+        return;
+      }
+
+      // Check if ready for data comparison
+      if (data.status === 'AUTHENTICATED' && data.readyForComparison) {
+        setStatus('success');
+        setMessage('DigiLocker authenticated! Redirecting to data entry...');
+        
+        // Redirect to data entry form after 1.5 seconds
+        setTimeout(() => {
+          navigate('/verify/enter-data', { 
+            state: { verificationId } 
+          });
+        }, 1500);
+      } else {
+        setStatus('error');
+        setMessage('Verification incomplete. Please try again.');
+        setTimeout(() => navigate('/verify'), 3000);
+      }
+
+    } catch (error) {
+      setStatus('error');
+      setMessage(`Error: ${error.message}`);
+      setTimeout(() => navigate('/verify'), 3000);
+    }
+  }
+
+  return (
+    <div className="callback-container">
+      {status === 'processing' && (
+        <div>
+          <div className="spinner"></div>
+          <p>{message}</p>
+        </div>
+      )}
+      {status === 'success' && (
+        <div className="success">
+          <p>✓ {message}</p>
+        </div>
+      )}
+      {status === 'error' && (
+        <div className="error">
+          <p>✗ {message}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### Step 2: Store VerificationId When Initiating
+
+```javascript
+// When calling POST /api/digilocker/initiate
+async function startDigiLockerVerification(mobileNumber) {
+  const response = await fetch('/api/digilocker/initiate', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ mobileNumber })
+  });
+
+  const data = await response.json();
+  
+  // Store verificationId for callback page
+  sessionStorage.setItem('digilockerVerificationId', data.verificationId);
+  
+  // Redirect user to DigiLocker
+  window.location.href = data.consentUrl;
+}
+```
+
+### Step 3: Handle URL Parameters
+
+DigiLocker may append query parameters to the redirect URL:
+- `verification_id`: The verification ID
+- `status`: Verification status
+- `error`: Error message (if any)
+
+Extract these from the URL:
+```javascript
+const urlParams = new URLSearchParams(window.location.search);
+const verificationId = urlParams.get('verification_id');
+const status = urlParams.get('status');
+const error = urlParams.get('error');
+```
+
+**Important Notes:**
+- The redirect URI is configured in the backend: `${FRONTEND_URL}/digilocker/callback`
+- Make sure `FRONTEND_URL` environment variable is set correctly
+- The callback page must be accessible (handle auth redirect if needed)
+- Always validate the verificationId before calling the backend
+- Clear sessionStorage after successful verification
+
+---
+
 ## Implementation Details
+
+### Redirect URI Configuration
+
+The backend automatically configures the redirect URI when creating the consent URL:
+- Format: `${FRONTEND_URL}/digilocker/callback`
+- Default: `http://localhost:3000/digilocker/callback` (if `FRONTEND_URL` not set)
+- Must be whitelisted in Cashfree Dashboard (if required)
 
 ### Country Gating
 
@@ -315,17 +549,9 @@ Compares these critical fields (all must match):
 ### Quick Test (5 minutes)
 
 1. Start backend: `npm run start:dev`
-2. Run test script: `bash test-digilocker.sh`
-3. Follow prompts to complete flow
-
-### Manual Test
-
-Use `DIGILOCKER_TEST_FLOW.http` file in VS Code REST Client:
-```
-# Install REST Client extension
-# Open file in VS Code
-# Click "Send Request" on each step
-```
+2. Set `FRONTEND_URL` in `.env`: `FRONTEND_URL=http://localhost:3000`
+3. Create callback page at `/digilocker/callback`
+4. Follow the flow from initiate → DigiLocker → callback → complete
 
 ### Test Data
 
@@ -368,6 +594,14 @@ Aadhaar Data (Example):
 **Cause:** DigiLocker account is linked to another user  
 **Fix:** Use different mobile number
 
+### "Redirect not working"
+
+**Cause:** `FRONTEND_URL` not set or callback page not created  
+**Fix:** 
+- Set `FRONTEND_URL` in `.env`
+- Create callback page at `/digilocker/callback`
+- Whitelist redirect URI in Cashfree Dashboard
+
 ### "x-cf-signature missing" or "Signature mismatch"
 
 **Cause:** Invalid public key or timestamp  
@@ -375,14 +609,6 @@ Aadhaar Data (Example):
 - Verify `CASHFREE_PUBLIC_KEY` is correct in `.env`
 - Check Cashfree credentials are valid
 - Review backend logs for signature generation errors
-
-### "404 Route Not Found" from Cashfree
-
-**Cause:** Endpoint path or base URL mismatch  
-**Fix:**
-- Verify `CASHFREE_BASE_URL` matches Cashfree docs
-- Check endpoint: `/verification/digilocker/document/{type}?verification_id=...`
-- Review debug logs for exact request URL
 
 ---
 
@@ -400,8 +626,8 @@ A: If already verified, system returns success but won't re-verify. To change ve
 **Q: What documents are supported?**  
 A: Currently only Aadhaar. PAN and Driving License support can be added.
 
-**Q: Is there automatic face detection?**  
-A: No, currently manual admin review. ML integration for auto-detection is TODO.
+**Q: Where does DigiLocker redirect after completion?**  
+A: To `${FRONTEND_URL}/digilocker/callback` - make sure this page exists and handles the callback.
 
 **Q: Where is DigiLocker data stored?**  
 A: Only comparison result and verified fields are stored in `UserVerification`. Raw Aadhaar data is not persisted.
@@ -413,8 +639,8 @@ A: Return 503 Service Unavailable error and suggest user try again later.
 
 ## Related Documentation
 
+- [User Onboarding Guide](../USER_ONBOARDING.md) - Complete onboarding flow
 - [Video Verification](../video-verification/README.md) - Next verification step
-- [Complete Verification Flow](../guides/COMPLETE_VERIFICATION_FLOW.md) - Full user journey
 - [API Documentation Index](../INDEX.md) - All API endpoints
 
 ---

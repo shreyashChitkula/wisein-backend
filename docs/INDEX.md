@@ -1,8 +1,8 @@
 # Backend API Documentation - Complete Reference
 
-**Last Updated:** November 13, 2025  
-**Version:** 2.0 - Comprehensive All Endpoints  
-**Status:** ✅ All 30+ endpoints documented
+**Last Updated:** November 16, 2025  
+**Version:** 3.0 - Updated with Latest Features  
+**Status:** ✅ All endpoints documented and up-to-date
 
 ---
 
@@ -93,6 +93,22 @@
 | GET | `/` | ❌ | Health check |
 
 **Total: 43 Endpoints across 6 modules**
+
+---
+
+## 📚 Documentation Guide
+
+### Getting Started
+1. **[User Onboarding Guide](./USER_ONBOARDING.md)** - Complete step-by-step onboarding flow with all routes
+2. **[DigiLocker Verification](./digilocker/README.md)** - Detailed DigiLocker integration guide
+3. **[Payment Integration](./payment/PAYMENT_API.md)** - Payment processing documentation
+4. **[Video Verification](./video-verification/README.md)** - Video verification guide
+
+### Quick Links
+- [User Onboarding Flow](./USER_ONBOARDING.md) - Start here for complete onboarding
+- [Payment API](./payment/PAYMENT_API.md) - Payment endpoints and integration
+- [DigiLocker API](./digilocker/README.md) - ID verification for Indian users
+- [Payment Frontend Guide](./payment/PAYMENT_FRONTEND_INTEGRATION.md) - Frontend integration examples
 
 ---
 

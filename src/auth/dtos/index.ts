@@ -45,11 +45,6 @@ export class VerifyIdWithDigilockerDto {
   authorizationCode: string;
 }
 
-export class VerifyIdWithStripeIdentityDto {
-  @IsString()
-  verificationSessionId: string;
-}
-
 export class UploadVideoDto {
   // File handling will be done via @UseInterceptors
   // The file will be passed in the request

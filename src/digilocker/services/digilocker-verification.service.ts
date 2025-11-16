@@ -526,7 +526,7 @@ export class DigiLockerVerificationService {
       
       // Construct redirect URI - where DigiLocker will redirect after completion
       // Default to frontend callback page, or use environment variable
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const frontendUrl = process.env.FRONTEND_URL || `http://localhost:${process.env.PORT}`;
       const redirectUri = `${frontendUrl}/digilocker/callback`;
       
       const payload = {

@@ -1,8 +1,12 @@
-# Onboarding Flow — Routes & Detailed Documentation
+# Onboarding Routes - Quick Reference
 
-This document describes the complete onboarding flow for a user from sign-up through subscription and payment. Each endpoint includes: Path, Method, Auth, Request/Response samples, prerequisites, frontend integration notes, and debug/help routes.
+> **⚠️ Note:** This is a quick reference. For complete step-by-step onboarding guide with detailed frontend integration examples, see **[USER_ONBOARDING.md](./USER_ONBOARDING.md)**
 
-Base URL in local dev: http://localhost:3000 (adjust for your environment)
+This document provides a quick reference for onboarding endpoints. Each endpoint includes: Path, Method, Auth, Request/Response samples, prerequisites, and frontend integration notes.
+
+**Base URL in local dev:** `http://localhost:3000` (adjust for your environment)
+
+**For complete onboarding flow with examples, see:** [USER_ONBOARDING.md](./USER_ONBOARDING.md)
 
 ## Overview (high-level sequence)
 1. Email/Phone OTP registration and verification

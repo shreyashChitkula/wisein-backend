@@ -150,7 +150,13 @@ enum PaymentType {
 2. Validate amount > 0
 3. Call Cashfree `/orders` endpoint
 4. Save order to `PaymentOrder` table with status=PENDING
-5. Return payment URL to frontend
+5. Construct payment URL from `payment_session_id` (format: `https://payments-test.cashfree.com/order/#{payment_session_id}`)
+6. Return payment URL to frontend
+
+**Important Notes:**
+- The payment URL is constructed from `payment_session_id`, NOT from `data.payments.url` (which is an API endpoint)
+- URL format: `https://payments-test.cashfree.com/order/#{payment_session_id}` (sandbox) or `https://payments.cashfree.com/order/#{payment_session_id}` (production)
+- The slash before the hash (`/order/#`) is required
 
 **Frontend Flow:**
 ```javascript
@@ -161,12 +167,20 @@ const response = await fetch('/api/payment/order', {
   body: JSON.stringify({ amount: 9999, currency: 'INR' })
 });
 
-// 2. Redirect to payment
-window.location.href = response.paymentUrl;
+const data = await response.json();
+
+// 2. Redirect to payment URL
+window.location.href = data.paymentUrl;
 
 // 3. After payment, Cashfree redirects to return_url
-// Frontend should poll /api/payment/subscription/:userId to check status
+// Frontend should poll /api/payment/status/:orderId to check status
 ```
+
+**Troubleshooting:**
+- If you see "authentication failed" or "client session is invalid":
+  1. Check domain whitelisting in Cashfree Dashboard → Developers → Whitelisting
+  2. Verify API credentials match environment (sandbox vs production)
+  3. Ensure payment URL format is correct (with `/order/#` before session ID)
 
 ---
 

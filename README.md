@@ -66,10 +66,19 @@ The API will be running at `http://localhost:3000`
 
 ## 📖 Documentation
 
-- **[Setup Guide](./SETUP_GUIDE.md)** - Detailed installation and configuration
-- **[API Reference](./API_REFERENCE.md)** - Complete API documentation
-- **[Onboarding Guide](./ONBOARDING_GUIDE.md)** - User onboarding flow
-- **[System Architecture](./SYSTEM_ARCHITECTURE.md)** - System design and flow diagrams
+### Getting Started
+- **[User Onboarding Guide](./docs/USER_ONBOARDING.md)** ⭐ **Start Here** - Complete step-by-step onboarding flow with all routes and frontend examples
+- **[API Reference](./docs/INDEX.md)** - Complete API documentation with all endpoints
+- **[Onboarding Routes](./docs/ONBOARDING_ROUTES.md)** - Quick reference for onboarding endpoints
+
+### Module Documentation
+- **[DigiLocker Verification](./docs/digilocker/README.md)** - ID verification for Indian users (with redirect support)
+- **[Payment Integration](./docs/payment/PAYMENT_API.md)** - Payment processing with Cashfree
+- **[Payment Frontend Guide](./docs/payment/PAYMENT_FRONTEND_INTEGRATION.md)** - Frontend integration examples
+- **[Video Verification](./docs/video-verification/README.md)** - Video verification guide
+- **[Subscriptions](./docs/subscriptions/SUBSCRIPTION_README.md)** - Subscription management
+
+### Database
 - **[Database Schema](./prisma/schema.prisma)** - Database structure
 
 ## 🔄 7-Step User Onboarding Flow
