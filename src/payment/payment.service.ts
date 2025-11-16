@@ -59,8 +59,28 @@ export class PaymentService {
       });
 
       const data = resp.data || {};
-      // Use payments.url from Cashfree response for redirect
-      const paymentUrl = data.payments?.url || '';
+      
+      // Extract payment_session_id - this is requcired to construct the payment URL
+      const paymentSessionId = data.payment_session_id;
+      
+      if (!paymentSessionId) {
+        this.logger.error('No payment_session_id in Cashfree response', JSON.stringify(data, null, 2));
+        throw new BadRequestException('Failed to create payment session: No payment_session_id in response');
+      }
+
+      // IMPORTANT: data.payments.url is an API endpoint, NOT a payment page URL
+      // We must construct the payment URL from payment_session_id
+      // Format: https://payments-test.cashfree.com/order/#{payment_session_id}
+      const isProduction = process.env.CASHFREE_ENV_PAYMENT === 'production';
+      const paymentBaseUrl = isProduction 
+        ? 'https://payments.cashfree.com/order'
+        : 'https://payments-test.cashfree.com/order';
+      
+      // Construct the payment URL with the session ID
+      const paymentUrl = `${paymentBaseUrl}/#${paymentSessionId}`;
+      
+      this.logger.log(`Payment URL: ${paymentUrl}`);
+      this.logger.log(`Payment Session ID: ${paymentSessionId}`);
 
       // Save order to database
       await this.prisma.paymentOrder.create({

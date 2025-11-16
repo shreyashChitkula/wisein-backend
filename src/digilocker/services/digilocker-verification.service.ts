@@ -523,11 +523,20 @@ export class DigiLockerVerificationService {
 
     try {
       const endpoint = '/verification/digilocker';
+      
+      // Construct redirect URI - where DigiLocker will redirect after completion
+      // Default to frontend callback page, or use environment variable
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const redirectUri = `${frontendUrl}/digilocker/callback`;
+      
       const payload = {
         verification_id: verificationId,
         document_requested: documents,
         user_flow: userFlow,
+        redirect_uri: redirectUri, // Add redirect URI so DigiLocker redirects back to our page
       };
+
+      this.logger.log(`DigiLocker redirect URI: ${redirectUri}`);
 
       const response = await this.makeApiRequest(endpoint, 'POST', payload);
       return response;
