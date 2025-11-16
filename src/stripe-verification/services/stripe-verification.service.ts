@@ -83,7 +83,7 @@ export class StripeVerificationService {
         where: { userId },
       });
 
-      if (existingVerification?.verified && existingVerification.verificationStatus === 'VERIFIED') {
+      if (existingVerification?.verificationStatus === 'VERIFIED') {
         this.logger.log(`User ${userId} already has verified identity`);
         return {
           success: true,
@@ -180,7 +180,7 @@ export class StripeVerificationService {
           where: { userId },
         });
 
-        if (existingVerification?.verified) {
+        if (existingVerification?.verificationStatus === 'VERIFIED') {
           return {
             success: true,
             message: 'Identity already verified',

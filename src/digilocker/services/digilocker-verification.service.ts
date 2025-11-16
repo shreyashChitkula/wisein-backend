@@ -10,10 +10,8 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   InitiateDigiLockerDto,
-  ProcessDigiLockerCallbackDto,
   CompleteDigiLockerVerificationDto,
   DigiLockerInitiationResponseDto,
-  DigiLockerCallbackResponseDto,
   DigiLockerVerificationCompleteDto,
   DocumentType,
   UserFlow,
@@ -97,7 +95,7 @@ export class DigiLockerVerificationService {
         where: { userId },
       });
 
-      if (existingVerification?.verified) {
+      if (existingVerification?.verificationStatus === 'VERIFIED') {
         return {
           success: true,
           accountExists: true,
@@ -179,69 +177,6 @@ export class DigiLockerVerificationService {
       };
     } catch (error) {
       this.logger.error(`Error initiating verification: ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Step 2: Process DigiLocker Callback
-   * Handles callback after user completes consent flow
-   */
-  async processCallback(
-    userId: string,
-    dto: ProcessDigiLockerCallbackDto,
-  ): Promise<DigiLockerCallbackResponseDto> {
-    this.logger.log(
-      `Processing DigiLocker callback for user: ${userId}, verification: ${dto.verificationId}`,
-    );
-
-    try {
-      // Ensure caller is eligible for DigiLocker (India-only)
-      const caller = await this.prisma.user.findUnique({ where: { id: userId } });
-      if (!caller) throw new BadRequestException('User not found');
-      if (caller.country && caller.country.toLowerCase() !== 'india') {
-        this.logger.warn(`User ${userId} attempted DigiLocker callback but country is ${caller.country}`);
-        throw new BadRequestException(
-          'DigiLocker verification is available only for users in India. Please use Stripe verification for users outside India.',
-        );
-      }
-
-      // Get verification session
-      const session = await this.prisma.digiLockerVerificationSession.findUnique({
-        where: { verificationId: dto.verificationId },
-      });
-
-      if (!session || session.userId !== userId) {
-        throw new BadRequestException('Invalid verification session');
-      }
-
-      // Check status with Cashfree
-      const statusResult = await this.getDigiLockerVerificationStatus(
-        dto.verificationId,
-      );
-
-      // Update session status
-      await this.prisma.digiLockerVerificationSession.update({
-        where: { verificationId: dto.verificationId },
-        data: {
-          status:
-            statusResult.status === 'AUTHENTICATED'
-              ? 'AUTHENTICATED'
-              : 'PENDING',
-        },
-      });
-
-      return {
-        success: statusResult.status === 'AUTHENTICATED',
-        status: statusResult.status as VerificationStatus,
-        readyForComparison: statusResult.status === 'AUTHENTICATED',
-        message:
-          statusResult.status === 'AUTHENTICATED'
-            ? 'DigiLocker verification successful. Ready for comparison.'
-            : 'Verification still pending.',
-      };
-    } catch (error) {
-      this.logger.error(`Error processing callback: ${error.message}`);
       throw error;
     }
   }
@@ -335,24 +270,12 @@ export class DigiLockerVerificationService {
       await this.prisma.userVerification.upsert({
         where: { userId },
         update: {
+          method: 'DIGILOCKER' as any, // Update method if switching from Stripe to DigiLocker
           digilockerAccountId,
           verified: true,
-          nameAsPerAadhaar: dto.userProvidedData.nameAsPerAadhaar,
-          dateOfBirth: new Date(dto.userProvidedData.dateOfBirth),
-          gender: dto.userProvidedData.gender,
-          state: dto.userProvidedData.state,
-          district: dto.userProvidedData.district || null,
-          pincode: dto.userProvidedData.pincode,
-          phoneNumber: dto.userProvidedData.phoneNumber,
-          addressLine1: dto.userProvidedData.addressLine1,
-          addressLine2: dto.userProvidedData.addressLine2 || null,
-          comparisonResult: comparisonResult,
-        },
-        create: {
-          userId,
-          method: 'DIGILOCKER' as any,
-          digilockerAccountId,
-          verified: true,
+          verificationStatus: 'VERIFIED',
+          verifiedAt: new Date(),
+          idNumber: digilockerDocument.uid, // Store Aadhaar number
           nameAsPerAadhaar: dto.userProvidedData.nameAsPerAadhaar,
           dateOfBirth: new Date(dto.userProvidedData.dateOfBirth),
           gender: dto.userProvidedData.gender,
@@ -363,6 +286,28 @@ export class DigiLockerVerificationService {
           phoneNumber: dto.userProvidedData.phoneNumber,
           addressLine1: dto.userProvidedData.addressLine1,
           addressLine2: dto.userProvidedData.addressLine2 || null,
+          verifiedData: digilockerDocument, // Store raw DigiLocker data
+          comparisonResult: comparisonResult,
+        },
+        create: {
+          userId,
+          method: 'DIGILOCKER' as any,
+          digilockerAccountId,
+          verified: true,
+          verificationStatus: 'VERIFIED',
+          verifiedAt: new Date(),
+          idNumber: digilockerDocument.uid, // Store Aadhaar number
+          nameAsPerAadhaar: dto.userProvidedData.nameAsPerAadhaar,
+          dateOfBirth: new Date(dto.userProvidedData.dateOfBirth),
+          gender: dto.userProvidedData.gender,
+          country: dto.userProvidedData.country,
+          state: dto.userProvidedData.state,
+          district: dto.userProvidedData.district || null,
+          pincode: dto.userProvidedData.pincode,
+          phoneNumber: dto.userProvidedData.phoneNumber,
+          addressLine1: dto.userProvidedData.addressLine1,
+          addressLine2: dto.userProvidedData.addressLine2 || null,
+          verifiedData: digilockerDocument, // Store raw DigiLocker data
           comparisonResult: comparisonResult,
         },
       });
@@ -376,9 +321,12 @@ export class DigiLockerVerificationService {
       try {
         await this.prisma.user.update({
           where: { id: userId },
-          data: { status: 'ID_VERIFIED' },
+          data: { 
+            status: 'ID_VERIFIED',
+            country: 'India' // Set country for DigiLocker users
+          },
         });
-        this.logger.log(`User onboarding status updated to ID_VERIFIED for user: ${userId}`);
+        this.logger.log(`User onboarding status updated to ID_VERIFIED and country set to India for user: ${userId}`);
       } catch (err) {
         // Log but don't fail the whole flow if updating user status fails
         this.logger.error(`Failed to update user status for ${userId}: ${err.message}`);
@@ -477,8 +425,8 @@ export class DigiLockerVerificationService {
 
     return {
       needsMigration: false,
-      verificationType: verification?.verified ? 'DIGILOCKER' : null,
-      verified: verification?.verified || false,
+      verificationType: verification?.verificationStatus === 'VERIFIED' ? verification.method : null,
+      verified: verification?.verificationStatus === 'VERIFIED' || false,
     };
   }
 
@@ -526,14 +474,14 @@ export class DigiLockerVerificationService {
       
       // Construct redirect URI - where DigiLocker will redirect after completion
       // Default to frontend callback page, or use environment variable
-      const frontendUrl = process.env.FRONTEND_URL || `http://localhost:${process.env.PORT}`;
-      const redirectUri = `${frontendUrl}/digilocker/callback`;
+      const frontendUrl = process.env.FRONTEND_URL || `http://localhost:3000`;
+      const redirectUri = `${frontendUrl}/digilocker/callback?verification_id=${verificationId}`;
       
       const payload = {
         verification_id: verificationId,
         document_requested: documents,
         user_flow: userFlow,
-        redirect_uri: redirectUri, // Add redirect URI so DigiLocker redirects back to our page
+        redirect_url: redirectUri, // Add redirect URI so DigiLocker redirects back to our page
       };
 
       this.logger.log(`DigiLocker redirect URI: ${redirectUri}`);
@@ -541,7 +489,7 @@ export class DigiLockerVerificationService {
       const response = await this.makeApiRequest(endpoint, 'POST', payload);
       return response;
     } catch (error) {
-      this.logger.error(`Failed to create consent URL: ${error.message}`);
+      this.logger.error(`Failed to create consent URL: ${error.response?.data || error.message}`);
       throw new HttpException(
         'Failed to create verification URL',
         HttpStatus.SERVICE_UNAVAILABLE,

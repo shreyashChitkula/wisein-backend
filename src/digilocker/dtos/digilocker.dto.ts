@@ -66,25 +66,6 @@ export class DigiLockerInitiationResponseDto {
 }
 
 /**
- * Request DTO: Process DigiLocker Callback
- */
-export class ProcessDigiLockerCallbackDto {
-  @IsString()
-  @IsNotEmpty()
-  verificationId: string;
-}
-
-/**
- * Response DTO: DigiLocker Callback Response
- */
-export class DigiLockerCallbackResponseDto {
-  success: boolean;
-  status: VerificationStatus;
-  readyForComparison: boolean;
-  message: string;
-}
-
-/**
  * Request DTO: Complete DigiLocker Verification with User Data
  */
 export class CompleteDigiLockerVerificationDto {

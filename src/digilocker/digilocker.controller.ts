@@ -15,7 +15,6 @@ import type { Response, Request as ExpressRequest } from 'express';
 import { DigiLockerVerificationService } from './services/digilocker-verification.service';
 import {
   InitiateDigiLockerDto,
-  ProcessDigiLockerCallbackDto,
   CompleteDigiLockerVerificationDto,
   UserProvidedData,
 } from './dtos/digilocker.dto';
@@ -135,100 +134,24 @@ export class DigiLockerVerificationController {
    * **Step 1: Create a callback page/route**
    * Create a page at `/digilocker/callback` in your frontend (React/Vue/Angular)
    * 
-   * **Step 2: Handle the redirect in your callback page**
+   * **Step 2: Check verification status**
+   * Use the `/api/digilocker/status/:verificationId` endpoint to check if verification is ready
+   * 
    * ```javascript
-   * // Example: React component for /digilocker/callback
-   * import { useEffect, useState } from 'react';
-   * import { useSearchParams, useNavigate } from 'react-router-dom';
-   * 
-   * function DigiLockerCallback() {
-   *   const [searchParams] = useSearchParams();
-   *   const navigate = useNavigate();
-   *   const [status, setStatus] = useState('processing');
-   *   const [message, setMessage] = useState('Processing DigiLocker response...');
-   * 
-   *   useEffect(() => {
-   *     handleCallback();
-   *   }, []);
-   * 
-   *   async function handleCallback() {
-   *     try {
-   *       // Get verificationId from URL params (DigiLocker may send it)
-   *       // OR from sessionStorage (stored when initiating verification)
-   *       const verificationId = searchParams.get('verification_id') 
-   *                          || sessionStorage.getItem('digilockerVerificationId');
-   * 
-   *       if (!verificationId) {
-   *         setStatus('error');
-   *         setMessage('Verification session not found. Please start over.');
-   *         setTimeout(() => navigate('/verify'), 3000);
-   *         return;
-   *       }
-   * 
-   *       // Get auth token
-   *       const token = localStorage.getItem('authToken');
-   *       if (!token) {
-   *         setStatus('error');
-   *         setMessage('Please login to continue');
-   *         setTimeout(() => navigate('/login'), 2000);
-   *         return;
-   *       }
-   * 
-   *       // Call backend callback endpoint
-   *       const response = await fetch('http://localhost:3000/api/digilocker/callback', {
-   *         method: 'POST',
-   *         headers: {
-   *           'Authorization': `Bearer ${token}`,
-   *           'Content-Type': 'application/json'
-   *         },
-   *         body: JSON.stringify({ verificationId })
-   *       });
-   * 
-   *       const data = await response.json();
-   * 
-   *       if (!response.ok || !data.success) {
-   *         setStatus('error');
-   *         setMessage(data.message || 'DigiLocker authentication failed');
-   *         setTimeout(() => navigate('/verify'), 3000);
-   *         return;
-   *       }
-   * 
-   *       // Check if ready for data comparison
-   *       if (data.status === 'AUTHENTICATED' && data.readyForComparison) {
-   *         setStatus('success');
-   *         setMessage('DigiLocker authenticated! Redirecting to data entry...');
-   *         
-   *         // Redirect to data entry form after 1.5 seconds
-   *         setTimeout(() => {
-   *           navigate('/verify/enter-data', { 
-   *             state: { verificationId } 
-   *           });
-   *         }, 1500);
-   *       } else {
-   *         setStatus('error');
-   *         setMessage('Verification incomplete. Please try again.');
-   *         setTimeout(() => navigate('/verify'), 3000);
-   *       }
-   * 
-   *     } catch (error) {
-   *       setStatus('error');
-   *       setMessage(`Error: ${error.message}`);
-   *       setTimeout(() => navigate('/verify'), 3000);
-   *     }
+   * // Check status instead of calling callback endpoint
+   * const response = await fetch(`http://localhost:3000/api/digilocker/status/${verificationId}`, {
+   *   headers: {
+   *     'Authorization': `Bearer ${token}`
    *   }
+   * });
+   * const data = await response.json();
+   * if (data.status === 'AUTHENTICATED' && data.readyForComparison) {
+   *   // Show data entry form
+   * }
+   * ```
    * 
-   *   return (
-   *     <div className="callback-container">
-   *       {status === 'processing' && (
-   *         <div>
-   *           <div className="spinner"></div>
-   *           <p>{message}</p>
-   *         </div>
-   *       )}
-   *       {status === 'success' && (
-   *         <div className="success">
-   *           <p>✓ {message}</p>
-   *         </div>
+   * **Step 3: Handle data entry**
+   * If status is 'AUTHENTICATED', show data entry form and call `/api/digilocker/complete`
    *       )}
    *       {status === 'error' && (
    *         <div className="error">
@@ -284,28 +207,6 @@ export class DigiLockerVerificationController {
    * - Always validate the verificationId before calling the backend
    * - Clear sessionStorage after successful verification
    */
-  @Post('callback')
-  async processCallback(
-    @Body() dto: ProcessDigiLockerCallbackDto,
-    @Req() req: Request,
-    @Res() res: Response,
-  ) {
-    try {
-      const userId = req.user?.id;
-      if (!userId) {
-        return res.status(HttpStatus.UNAUTHORIZED).json({
-          success: false,
-          message: 'User authentication required',
-        });
-      }
-
-      const result = await this.digiLockerService.processCallback(userId, dto);
-      return res.status(HttpStatus.OK).json(result);
-    } catch (error) {
-      this.logger.error(`Error processing callback: ${error.message}`);
-      throw error;
-    }
-  }
 
   /**
   * POST /api/digilocker/complete
@@ -406,7 +307,7 @@ export class DigiLockerVerificationController {
   ) {
     try {
       const result = await this.digiLockerService.getVerificationStatus(
-        verificationId,
+        verificationId, 
       );
       return res.status(HttpStatus.OK).json(result);
     } catch (error) {

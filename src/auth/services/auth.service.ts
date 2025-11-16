@@ -274,6 +274,16 @@ export class AuthService {
       throw new BadRequestException('User not found');
     }
 
+    // Check for active DigiLocker verification sessions
+    const activeDigiLockerSession = await this.prisma.digiLockerVerificationSession.findFirst({
+      where: {
+        userId,
+        status: {
+          in: ['INITIATED', 'AUTHENTICATED', 'PENDING'],
+        },
+      },
+    });
+
     const completedSteps: string[] = [];
     let nextStep = '';
 
@@ -281,7 +291,13 @@ export class AuthService {
       nextStep = 'Verify OTP';
     } else if (user.status === 'EMAIL_VERIFIED') {
       completedSteps.push('Email Verified');
-      nextStep = 'Select Country';
+      
+      // If user has active DigiLocker session, they're in ID verification
+      if (activeDigiLockerSession) {
+        nextStep = 'Complete ID Verification';
+      } else {
+        nextStep = 'Select Country';
+      }
     } else if (user.status === 'ID_VERIFIED') {
       completedSteps.push('Email Verified', 'Country Selected', 'ID Verified');
       nextStep = 'Upload Video';
@@ -320,8 +336,10 @@ export class AuthService {
       nextStep,
       details: {
         email: user.email,
-        country: user.country,
-        verificationMethod: user.country?.toLowerCase() === 'india' ? 'DIGILOCKER' : 'STRIPE_IDENTITY',
+        country: user.verification?.country || user.country,
+        verificationMethod: user.verification?.method || (activeDigiLockerSession 
+          ? 'DIGILOCKER' 
+          : (user.country?.toLowerCase() === 'india' ? 'DIGILOCKER' : 'STRIPE_IDENTITY')),
         verification: user.verification
           ? {
               status: user.verification.verificationStatus,
