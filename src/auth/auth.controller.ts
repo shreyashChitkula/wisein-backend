@@ -419,6 +419,15 @@ export class AuthController {
     @Req() req,
     @Body() body: { planId: string },
   ) {
+    // Check if user exists
+    if (!req.user.user) {
+      throw new BadRequestException('User not found');
+    }
+    
+    // Check if user has completed all verification steps
+    if (req.user.user.status !== 'APPROVED') {
+      throw new ForbiddenException('User must complete all verification steps before subscribing');
+    }
     return this.subscriptionService.createCheckoutSession(req.user.id, body);
   }
 

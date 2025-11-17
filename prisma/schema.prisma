@@ -52,6 +52,7 @@ enum SubscriptionPlanType {
 }
 
 enum SubscriptionStatus {
+  PENDING
   ACTIVE
   EXPIRED
   CANCELLED
@@ -458,6 +459,11 @@ model PaymentOrder {
   // Customer details
   customerPhone     String?
   customerEmail     String?
+  // Subscription fields
+  isSubscription    Boolean  @default(false)
+  planId            String?
+  planType          SubscriptionPlanType?
+  planName          String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   @@index([userId])

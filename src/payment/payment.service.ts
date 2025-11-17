@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
 import axios from 'axios';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,7 +13,7 @@ export class PaymentService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async createPaymentOrder(userId: string, amount: number, currency = 'INR', customerPhone?: string) {
+  async createPaymentOrder(userId: string, amount: number, currency = 'INR', customerPhone?: string, subscriptionOptions?: { isSubscription: boolean; planId?: string; planType?: string; planName?: string }) {
   // Debug: Print Cashfree credentials and endpoint
   this.logger.log(`CASHFREE_API_KEY_PAYMENT: ${this.apiKey?.substring(0, 8)}...`);
   this.logger.log(`CASHFREE_API_SECRET_PAYMENT: ${this.apiSecret?.substring(0, 8)}...`);
@@ -93,6 +93,10 @@ export class PaymentService {
           status: 'PENDING',
           customerPhone,
           customerEmail: 'test@example.com',
+          isSubscription: subscriptionOptions?.isSubscription || false,
+          planId: subscriptionOptions?.planId,
+          planType: subscriptionOptions?.planType as any,
+          planName: subscriptionOptions?.planName,
         },
       });
 
@@ -143,7 +147,7 @@ export class PaymentService {
           await this.prisma.paymentRecord.create({
             data: {
               userId: order.userId,
-              paymentType: 'ORDER',
+              paymentType: order.isSubscription ? 'SUBSCRIPTION' : 'ORDER',
               orderId: order.id,
               amount: order.amount,
               currency: order.currency,
@@ -153,6 +157,48 @@ export class PaymentService {
               paidAt: new Date(),
             },
           });
+
+          // If this is a subscription payment, activate the subscription
+          if (order.isSubscription && order.planId && order.planType && order.planName) {
+            const endDate = new Date();
+            // Calculate end date based on plan (yearly vs monthly)
+            if (order.planId.includes('yearly') || order.planId.includes('year')) {
+              endDate.setFullYear(endDate.getFullYear() + 1);
+            } else {
+              endDate.setMonth(endDate.getMonth() + 1);
+            }
+
+            await this.prisma.subscription.upsert({
+              where: { userId: order.userId },
+              update: {
+                cashfreeOrderId: order_id,
+                cashfreePaymentId: payload.payment_id,
+                status: 'ACTIVE',
+                startDate: new Date(),
+                endDate,
+                autoRenew: true,
+                planType: order.planType,
+                planName: order.planName,
+              },
+              create: {
+                userId: order.userId,
+                planType: order.planType,
+                planName: order.planName,
+                cashfreeOrderId: order_id,
+                cashfreePaymentId: payload.payment_id,
+                status: 'ACTIVE',
+                startDate: new Date(),
+                endDate,
+                autoRenew: true,
+              },
+            });
+
+            // Update user status to ACTIVE
+            await this.prisma.user.update({
+              where: { id: order.userId },
+              data: { status: 'ACTIVE' },
+            });
+          }
         }
       } else if (payment_status === 'FAILED') {
         await this.prisma.paymentOrder.updateMany({
@@ -222,6 +268,92 @@ export class PaymentService {
       };
     } catch (error) {
       this.logger.error('getUserPaymentHistory error', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Manually complete subscription for development/testing (when webhooks don't fire)
+   */
+  async completeSubscriptionManually(orderId: string, userId: string) {
+    try {
+      // Find the payment order
+      const order = await this.prisma.paymentOrder.findUnique({
+        where: { orderId },
+      });
+
+      if (!order) {
+        throw new BadRequestException('Payment order not found');
+      }
+
+      if (order.userId !== userId) {
+        throw new ForbiddenException('Order does not belong to user');
+      }
+
+      if (!order.isSubscription) {
+        throw new BadRequestException('Order is not for subscription');
+      }
+
+      // Check if subscription already exists
+      const existingSubscription = await this.prisma.subscription.findUnique({
+        where: { userId },
+      });
+
+      if (existingSubscription) {
+        return { message: 'Subscription already exists', subscription: existingSubscription };
+      }
+
+      // Create the subscription
+      const endDate = new Date();
+      if (order.planId?.includes('yearly') || order.planId?.includes('year')) {
+        endDate.setFullYear(endDate.getFullYear() + 1);
+      } else {
+        endDate.setMonth(endDate.getMonth() + 1);
+      }
+
+      const subscription = await this.prisma.subscription.create({
+        data: {
+          userId: order.userId,
+          planType: order.planType || 'INDIVIDUAL',
+          planName: order.planName || 'Premium',
+          cashfreeOrderId: orderId,
+          cashfreePaymentId: `manual_${Date.now()}`,
+          status: 'ACTIVE',
+          startDate: new Date(),
+          endDate,
+          autoRenew: true,
+        },
+      });
+
+      // Update user status
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { status: 'ACTIVE' },
+      });
+
+      // Update payment order status
+      await this.prisma.paymentOrder.update({
+        where: { id: order.id },
+        data: { status: 'SUCCESS' },
+      });
+
+      // Create payment record
+      await this.prisma.paymentRecord.create({
+        data: {
+          userId,
+          paymentType: 'SUBSCRIPTION',
+          orderId: order.id,
+          amount: order.amount,
+          currency: order.currency,
+          status: 'SUCCESS',
+          cashfreeOrderId: orderId,
+          paidAt: new Date(),
+        },
+      });
+
+      return { message: 'Subscription completed successfully', subscription };
+    } catch (error) {
+      this.logger.error('completeSubscriptionManually error', error);
       throw error;
     }
   }

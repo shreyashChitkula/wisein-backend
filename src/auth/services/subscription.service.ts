@@ -49,7 +49,13 @@ export class SubscriptionService {
       userId,
       orderAmount,
       currency,
-      undefined // customerPhone, if needed
+      "7036716403", // customerPhone, if needed
+      {
+        isSubscription: true,
+        planId: planDto.planId,
+        planType: match.id.startsWith('ind') ? 'INDIVIDUAL' : 'COMPANY',
+        planName: match.name,
+      }
     );
 
     return {

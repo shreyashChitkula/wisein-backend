@@ -56,4 +56,22 @@ export class PaymentController {
 
     return { success: true, result };
   }
+
+  // Development endpoint to manually complete subscription (for testing when webhooks don't fire)
+  @Post('complete-subscription/:orderId')
+  @UseGuards(JwtAuthGuard)
+  async completeSubscription(@Param('orderId') orderId: string, @Req() req: any) {
+    try {
+      // Only allow in development
+      if (process.env.NODE_ENV === 'production') {
+        return { success: false, message: 'Not available in production' };
+      }
+
+      const result = await this.paymentService.completeSubscriptionManually(orderId, req.user.id);
+      return { success: true, result };
+    } catch (error) {
+      this.logger.error('Error completing subscription manually:', error);
+      return { success: false, message: error.message };
+    }
+  }
 }
