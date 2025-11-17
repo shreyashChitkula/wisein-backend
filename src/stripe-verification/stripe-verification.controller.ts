@@ -30,17 +30,17 @@ export class StripeVerificationController {
   /**
    * POST /api/stripe-verification/create-session
    * Create Stripe Identity verification session
-   * 
+   *
    * This endpoint creates a Stripe Identity verification session for non-Indian users.
    * Users will be redirected to Stripe's verification page to complete identity verification.
-   * 
+   *
    * **Prerequisites:**
    * - User must be authenticated
    * - User must NOT be from India (DigiLocker should be used for Indian users)
-   * 
+   *
    * **Request:**
    * No request body required
-   * 
+   *
    * **Response (200 OK):**
    * ```json
    * {
@@ -50,7 +50,7 @@ export class StripeVerificationController {
    *   "clientSecret": "vs_1234567890abcdef_secret_..."
    * }
    * ```
-   * 
+   *
    * **If user already verified:**
    * ```json
    * {
@@ -59,7 +59,7 @@ export class StripeVerificationController {
    *   "url": ""
    * }
    * ```
-   * 
+   *
    * **Error Responses:**
    * - 400: User is from India (should use DigiLocker)
    * - 401: Unauthorized (missing/invalid token)
@@ -80,9 +80,10 @@ export class StripeVerificationController {
     }
 
     try {
-      const result = await this.stripeVerificationService.createStripeIdentitySession(
-        userId,
-      );
+      const result =
+        await this.stripeVerificationService.createStripeIdentitySession(
+          userId,
+        );
       return res.status(HttpStatus.OK).json(result);
     } catch (error) {
       this.logger.error(`Error creating Stripe session: ${error.message}`);
@@ -96,21 +97,21 @@ export class StripeVerificationController {
   /**
    * POST /api/stripe-verification/verify
    * Verify Stripe Identity session result
-   * 
+   *
    * This endpoint verifies the status of a Stripe Identity verification session
    * and updates the user's verification status accordingly.
-   * 
+   *
    * **Prerequisites:**
    * - User must be authenticated
    * - User must have created a verification session via /create-session
-   * 
+   *
    * **Request Body:**
    * ```json
    * {
    *   "verificationSessionId": "vs_1234567890abcdef"
    * }
    * ```
-   * 
+   *
    * **Response (200 OK) - Verified:**
    * ```json
    * {
@@ -129,7 +130,7 @@ export class StripeVerificationController {
    *   }
    * }
    * ```
-   * 
+   *
    * **Response (200 OK) - Processing:**
    * ```json
    * {
@@ -138,7 +139,7 @@ export class StripeVerificationController {
    *   "verificationStatus": "PENDING"
    * }
    * ```
-   * 
+   *
    * **Response (200 OK) - Requires Input:**
    * ```json
    * {
@@ -147,7 +148,7 @@ export class StripeVerificationController {
    *   "verificationStatus": "PENDING"
    * }
    * ```
-   * 
+   *
    * **Error Responses:**
    * - 400: User is from India or invalid session
    * - 401: Unauthorized (missing/invalid token)
@@ -169,10 +170,11 @@ export class StripeVerificationController {
     }
 
     try {
-      const result = await this.stripeVerificationService.verifyStripeIdentitySession(
-        userId,
-        dto.verificationSessionId,
-      );
+      const result =
+        await this.stripeVerificationService.verifyStripeIdentitySession(
+          userId,
+          dto.verificationSessionId,
+        );
       return res.status(HttpStatus.OK).json(result);
     } catch (error) {
       this.logger.error(`Error verifying Stripe session: ${error.message}`);
@@ -186,10 +188,10 @@ export class StripeVerificationController {
   /**
    * GET /api/stripe-verification/status
    * Get Stripe verification status for the authenticated user
-   * 
+   *
    * Returns the current verification status, including whether the user is verified
    * and the verified data if available.
-   * 
+   *
    * **Response (200 OK) - Verified:**
    * ```json
    * {
@@ -205,7 +207,7 @@ export class StripeVerificationController {
    *   "verifiedAt": "2025-11-15T23:00:00.000Z"
    * }
    * ```
-   * 
+   *
    * **Response (200 OK) - Not Started:**
    * ```json
    * {
@@ -217,7 +219,7 @@ export class StripeVerificationController {
    *   "verifiedAt": null
    * }
    * ```
-   * 
+   *
    * **Error Responses:**
    * - 401: Unauthorized (missing/invalid token)
    * - 500: Internal server error
@@ -233,9 +235,10 @@ export class StripeVerificationController {
     }
 
     try {
-      const result = await this.stripeVerificationService.getStripeVerificationStatus(
-        userId,
-      );
+      const result =
+        await this.stripeVerificationService.getStripeVerificationStatus(
+          userId,
+        );
       return res.status(HttpStatus.OK).json(result);
     } catch (error) {
       this.logger.error(`Error getting status: ${error.message}`);
@@ -246,4 +249,3 @@ export class StripeVerificationController {
     }
   }
 }
-

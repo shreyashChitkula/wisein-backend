@@ -23,15 +23,17 @@ interface AuthRequest extends ExpressRequest {
 export class VideoVerificationController {
   private readonly logger = new Logger(VideoVerificationController.name);
 
-  constructor(private readonly videoVerificationService: VideoVerificationService) {}
+  constructor(
+    private readonly videoVerificationService: VideoVerificationService,
+  ) {}
 
   /**
    * POST /api/video-verification/create
    * Create video verification with photo and video URLs
-   * 
+   *
    * This endpoint accepts photo and video URLs and automatically approves the verification.
    * User status is upgraded to VIDEO_VERIFIED upon successful submission.
-   * 
+   *
    * **Request Body:**
    * ```json
    * {
@@ -39,7 +41,7 @@ export class VideoVerificationController {
    *   "videoUrl": "https://storage.example.com/videos/user123.mp4"
    * }
    * ```
-   * 
+   *
    * **Response (200 OK):**
    * ```json
    * {
@@ -49,7 +51,7 @@ export class VideoVerificationController {
    *   "verifiedAt": "2025-11-13T23:00:00.000Z"
    * }
    * ```
-   * 
+   *
    * **Error Responses:**
    * - 400: Missing photoUrl or videoUrl
    * - 401: Unauthorized (missing/invalid token)
@@ -69,17 +71,20 @@ export class VideoVerificationController {
       });
     }
 
-    const result = await this.videoVerificationService.createVideoVerification(dto, userId);
+    const result = await this.videoVerificationService.createVideoVerification(
+      dto,
+      userId,
+    );
     return res.status(HttpStatus.OK).json(result);
   }
 
   /**
    * GET /api/video-verification/status
    * Get video verification status for the authenticated user
-   * 
+   *
    * Returns the current verification status, including whether the user is verified
    * and the photo/video URLs if available.
-   * 
+   *
    * **Response (200 OK):**
    * ```json
    * {
@@ -91,7 +96,7 @@ export class VideoVerificationController {
    *   "videoUrl": "https://storage.example.com/videos/user123.mp4"
    * }
    * ```
-   * 
+   *
    * If no verification exists:
    * ```json
    * {
@@ -101,7 +106,7 @@ export class VideoVerificationController {
    *   "message": "Please complete video verification"
    * }
    * ```
-   * 
+   *
    * **Error Responses:**
    * - 401: Unauthorized (missing/invalid token)
    * - 500: Internal server error
@@ -116,7 +121,8 @@ export class VideoVerificationController {
       });
     }
 
-    const result = await this.videoVerificationService.getVideoVerificationStatus(userId);
+    const result =
+      await this.videoVerificationService.getVideoVerificationStatus(userId);
     return res.status(HttpStatus.OK).json(result);
   }
 }

@@ -39,10 +39,14 @@ export class StripeVerificationService {
       }
     } else {
       if (!stripeSecretKey) {
-        this.logger.warn('STRIPE_SECRET_KEY not found. Stripe verification will use placeholder mode.');
+        this.logger.warn(
+          'STRIPE_SECRET_KEY not found. Stripe verification will use placeholder mode.',
+        );
       }
       if (!Stripe) {
-        this.logger.warn('stripe package not installed. Install with: npm install stripe. Stripe verification will use placeholder mode.');
+        this.logger.warn(
+          'stripe package not installed. Install with: npm install stripe. Stripe verification will use placeholder mode.',
+        );
       }
     }
   }
@@ -51,9 +55,7 @@ export class StripeVerificationService {
    * Create Stripe Identity verification session
    * Generates a verification session URL for the user to complete identity verification
    */
-  async createStripeIdentitySession(
-    userId: string,
-  ): Promise<{
+  async createStripeIdentitySession(userId: string): Promise<{
     success: boolean;
     verificationSessionId: string;
     url: string;
@@ -79,9 +81,10 @@ export class StripeVerificationService {
       }
 
       // Check if user already has verified identity
-      const existingVerification = await this.prisma.userVerification.findUnique({
-        where: { userId },
-      });
+      const existingVerification =
+        await this.prisma.userVerification.findUnique({
+          where: { userId },
+        });
 
       if (existingVerification?.verificationStatus === 'VERIFIED') {
         this.logger.log(`User ${userId} already has verified identity`);
@@ -95,13 +98,14 @@ export class StripeVerificationService {
       // Create Stripe Identity verification session
       if (this.stripe) {
         try {
-          const session = await this.stripe.identity.verificationSessions.create({
-            type: 'document',
-            metadata: {
-              userId,
-              email: user.email,
-            },
-          });
+          const session =
+            await this.stripe.identity.verificationSessions.create({
+              type: 'document',
+              metadata: {
+                userId,
+                email: user.email,
+              },
+            });
 
           this.logger.log(`Stripe Identity session created: ${session.id}`);
 
@@ -119,7 +123,9 @@ export class StripeVerificationService {
         }
       } else {
         // Placeholder mode for development/testing
-        this.logger.warn('Using placeholder Stripe session (STRIPE_SECRET_KEY not configured)');
+        this.logger.warn(
+          'Using placeholder Stripe session (STRIPE_SECRET_KEY not configured)',
+        );
         const placeholderSessionId = `vs_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         return {
           success: true,
@@ -136,7 +142,9 @@ export class StripeVerificationService {
       ) {
         throw error;
       }
-      throw new InternalServerErrorException('Failed to create verification session');
+      throw new InternalServerErrorException(
+        'Failed to create verification session',
+      );
     }
   }
 
@@ -176,9 +184,10 @@ export class StripeVerificationService {
 
       // Handle already verified case
       if (verificationSessionId === 'already_verified') {
-        const existingVerification = await this.prisma.userVerification.findUnique({
-          where: { userId },
-        });
+        const existingVerification =
+          await this.prisma.userVerification.findUnique({
+            where: { userId },
+          });
 
         if (existingVerification?.verificationStatus === 'VERIFIED') {
           return {
@@ -193,9 +202,10 @@ export class StripeVerificationService {
       // Verify with Stripe API
       if (this.stripe) {
         try {
-          const session = await this.stripe.identity.verificationSessions.retrieve(
-            verificationSessionId,
-          );
+          const session =
+            await this.stripe.identity.verificationSessions.retrieve(
+              verificationSessionId,
+            );
 
           if (session.status === 'verified') {
             // Extract verified data from Stripe session
@@ -212,7 +222,8 @@ export class StripeVerificationService {
               address: session.verified_outputs?.address
                 ? `${session.verified_outputs.address.line1 || ''} ${session.verified_outputs.address.city || ''} ${session.verified_outputs.address.state || ''} ${session.verified_outputs.address.postal_code || ''} ${session.verified_outputs.address.country || ''}`.trim()
                 : null,
-              country: session.verified_outputs?.address?.country || user.country,
+              country:
+                session.verified_outputs?.address?.country || user.country,
               state: session.verified_outputs?.address?.state || null,
               pincode: session.verified_outputs?.address?.postal_code || null,
               addressLine1: session.verified_outputs?.address?.line1 || null,
@@ -245,7 +256,9 @@ export class StripeVerificationService {
               data: { status: 'ID_VERIFIED' },
             });
 
-            this.logger.log(`Stripe Identity verification successful for user: ${userId}`);
+            this.logger.log(
+              `Stripe Identity verification successful for user: ${userId}`,
+            );
 
             return {
               success: true,
@@ -256,13 +269,15 @@ export class StripeVerificationService {
           } else if (session.status === 'processing') {
             return {
               success: false,
-              message: 'Verification is still processing. Please check again later.',
+              message:
+                'Verification is still processing. Please check again later.',
               verificationStatus: 'PENDING',
             };
           } else if (session.status === 'requires_input') {
             return {
               success: false,
-              message: 'Additional information required. Please complete the verification process.',
+              message:
+                'Additional information required. Please complete the verification process.',
               verificationStatus: 'PENDING',
             };
           } else {
@@ -281,11 +296,14 @@ export class StripeVerificationService {
         }
       } else {
         // Placeholder mode for development/testing
-        this.logger.warn('Using placeholder Stripe verification (STRIPE_SECRET_KEY not configured)');
-        
+        this.logger.warn(
+          'Using placeholder Stripe verification (STRIPE_SECRET_KEY not configured)',
+        );
+
         const placeholderData = {
           name: user.name || 'Placeholder Name',
-          dateOfBirth: user.dateOfBirth?.toISOString().split('T')[0] || '1990-01-01',
+          dateOfBirth:
+            user.dateOfBirth?.toISOString().split('T')[0] || '1990-01-01',
           documentType: 'Passport',
           documentNumber: 'PLACEHOLDER123',
           gender: null,
@@ -323,7 +341,9 @@ export class StripeVerificationService {
           data: { status: 'ID_VERIFIED' },
         });
 
-        this.logger.warn(`Placeholder verification completed for user: ${userId}`);
+        this.logger.warn(
+          `Placeholder verification completed for user: ${userId}`,
+        );
 
         return {
           success: true,
@@ -341,7 +361,9 @@ export class StripeVerificationService {
       ) {
         throw error;
       }
-      throw new InternalServerErrorException('Failed to verify identity session');
+      throw new InternalServerErrorException(
+        'Failed to verify identity session',
+      );
     }
   }
 
@@ -384,8 +406,9 @@ export class StripeVerificationService {
       };
     } catch (error) {
       this.logger.error(`Error getting verification status: ${error.message}`);
-      throw new InternalServerErrorException('Failed to fetch verification status');
+      throw new InternalServerErrorException(
+        'Failed to fetch verification status',
+      );
     }
   }
 }
-

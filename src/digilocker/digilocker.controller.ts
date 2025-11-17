@@ -40,7 +40,7 @@ export class DigiLockerVerificationController {
   ) {}
 
   /**
-  * POST /api/digilocker/initiate
+   * POST /api/digilocker/initiate
    * Initiate DigiLocker verification flow
    *
    * Checks DigiLocker account existence and generates consent URL
@@ -92,7 +92,10 @@ export class DigiLockerVerificationController {
         });
       }
 
-      const result = await this.digiLockerService.initiateVerification(userId, dto);
+      const result = await this.digiLockerService.initiateVerification(
+        userId,
+        dto,
+      );
       return res.status(HttpStatus.OK).json(result);
     } catch (error) {
       this.logger.error(`Error initiating verification: ${error.message}`);
@@ -101,7 +104,7 @@ export class DigiLockerVerificationController {
   }
 
   /**
-  * POST /api/digilocker/callback
+   * POST /api/digilocker/callback
    * Process DigiLocker callback after consent
    *
    * Handles redirect from DigiLocker after user authenticates
@@ -128,15 +131,15 @@ export class DigiLockerVerificationController {
    * - 500: Processing error
    *
    * **FRONTEND INTEGRATION GUIDE:**
-   * 
+   *
    * After DigiLocker completes verification, it redirects to: `${FRONTEND_URL}/digilocker/callback`
-   * 
+   *
    * **Step 1: Create a callback page/route**
    * Create a page at `/digilocker/callback` in your frontend (React/Vue/Angular)
-   * 
+   *
    * **Step 2: Check verification status**
    * Use the `/api/digilocker/status/:verificationId` endpoint to check if verification is ready
-   * 
+   *
    * ```javascript
    * // Check status instead of calling callback endpoint
    * const response = await fetch(`http://localhost:3000/api/digilocker/status/${verificationId}`, {
@@ -149,7 +152,7 @@ export class DigiLockerVerificationController {
    *   // Show data entry form
    * }
    * ```
-   * 
+   *
    * **Step 3: Handle data entry**
    * If status is 'AUTHENTICATED', show data entry form and call `/api/digilocker/complete`
    *       )}
@@ -162,7 +165,7 @@ export class DigiLockerVerificationController {
    *   );
    * }
    * ```
-   * 
+   *
    * **Step 3: Store verificationId when initiating verification**
    * ```javascript
    * // When calling POST /api/digilocker/initiate
@@ -175,23 +178,23 @@ export class DigiLockerVerificationController {
    *     },
    *     body: JSON.stringify({ mobileNumber })
    *   });
-   * 
+   *
    *   const data = await response.json();
-   *   
+   *
    *   // Store verificationId for callback page
    *   sessionStorage.setItem('digilockerVerificationId', data.verificationId);
-   *   
+   *
    *   // Redirect user to DigiLocker
    *   window.location.href = data.consentUrl;
    * }
    * ```
-   * 
+   *
    * **Step 4: Handle URL parameters (optional)**
    * DigiLocker may append query parameters to the redirect URL:
    * - `verification_id`: The verification ID
    * - `status`: Verification status
    * - `error`: Error message (if any)
-   * 
+   *
    * Extract these from the URL:
    * ```javascript
    * const urlParams = new URLSearchParams(window.location.search);
@@ -199,7 +202,7 @@ export class DigiLockerVerificationController {
    * const status = urlParams.get('status');
    * const error = urlParams.get('error');
    * ```
-   * 
+   *
    * **Important Notes:**
    * - The redirect URI is configured in the backend: `${FRONTEND_URL}/digilocker/callback`
    * - Make sure `FRONTEND_URL` environment variable is set correctly
@@ -209,7 +212,7 @@ export class DigiLockerVerificationController {
    */
 
   /**
-  * POST /api/digilocker/complete
+   * POST /api/digilocker/complete
    * Complete verification with user data comparison
    *
    * Finalizes verification by comparing DigiLocker data with user input
@@ -270,7 +273,10 @@ export class DigiLockerVerificationController {
         });
       }
 
-      const result = await this.digiLockerService.completeVerification(userId, dto);
+      const result = await this.digiLockerService.completeVerification(
+        userId,
+        dto,
+      );
       return res.status(HttpStatus.OK).json(result);
     } catch (error) {
       this.logger.error(`Error completing verification: ${error.message}`);
@@ -279,7 +285,7 @@ export class DigiLockerVerificationController {
   }
 
   /**
-  * GET /api/digilocker/status/:verificationId
+   * GET /api/digilocker/status/:verificationId
    * Get verification status
    *
    * Check current status of verification (useful for polling)
@@ -306,9 +312,8 @@ export class DigiLockerVerificationController {
     @Res() res: Response,
   ) {
     try {
-      const result = await this.digiLockerService.getVerificationStatus(
-        verificationId, 
-      );
+      const result =
+        await this.digiLockerService.getVerificationStatus(verificationId);
       return res.status(HttpStatus.OK).json(result);
     } catch (error) {
       this.logger.error(`Error getting status: ${error.message}`);
@@ -317,7 +322,7 @@ export class DigiLockerVerificationController {
   }
 
   /**
-  * GET /api/digilocker/user-status
+   * GET /api/digilocker/user-status
    * Get user verification status
    *
    * Check if user is already verified via DigiLocker
@@ -346,9 +351,8 @@ export class DigiLockerVerificationController {
         });
       }
 
-      const result = await this.digiLockerService.checkUserVerificationStatus(
-        userId,
-      );
+      const result =
+        await this.digiLockerService.checkUserVerificationStatus(userId);
 
       return res.status(HttpStatus.OK).json({
         success: true,
@@ -364,7 +368,7 @@ export class DigiLockerVerificationController {
   }
 
   /**
-  * POST /api/digilocker/admin/cleanup-expired
+   * POST /api/digilocker/admin/cleanup-expired
    * Admin endpoint to cleanup expired sessions
    *
    * Removes expired verification sessions (24+ hours)
@@ -399,7 +403,7 @@ export class DigiLockerVerificationController {
   }
 
   /**
-  * GET /api/digilocker/health
+   * GET /api/digilocker/health
    * Health check endpoint
    *
    * Verify DigiLocker service is operational

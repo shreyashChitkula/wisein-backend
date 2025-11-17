@@ -9,4 +9,3 @@ export class VerifyStripeIdentityDto {
   @IsNotEmpty()
   verificationSessionId: string;
 }
-

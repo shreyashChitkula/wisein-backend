@@ -46,25 +46,25 @@ export class AuthController {
 
   /**
    * POST /auth/send-otp
-   * 
+   *
    * **Initiate registration flow** for new users.
-   * 
+   *
    * Accepts email and username, initiates email verification process:
    * 1. Checks if email is already registered and verified.
    * 2. Creates user account with REGISTERED status (in-memory during OTP flow).
    * 3. Generates and sends 6-digit OTP via email.
-   * 
+   *
    * **Request:**
    * ```
    * POST /auth/send-otp
    * Content-Type: application/json
-   * 
+   *
    * {
    *   "email": "user@example.com",
    *   "username": "johndoe"
    * }
    * ```
-   * 
+   *
    * **Response (success - 200):**
    * ```
    * {
@@ -72,7 +72,7 @@ export class AuthController {
    *   "status": 200
    * }
    * ```
-   * 
+   *
    * **Response (error - email already verified - 409):**
    * ```
    * {
@@ -80,9 +80,9 @@ export class AuthController {
    *   "status": 409
    * }
    * ```
-   * 
+   *
    * **Next step:** Call POST /auth/verify-otp with email and received OTP.
-   * 
+   *
    * @param sendOtpDto { email, username }
    * @returns { message, status, userId? }
    */
@@ -91,34 +91,38 @@ export class AuthController {
     this.logger.log(`[send-otp] Received request for ${sendOtpDto.email}`);
     try {
       const result = await this.authService.signup(sendOtpDto);
-      this.logger.log(`[send-otp] OTP sent successfully for ${sendOtpDto.email}`);
+      this.logger.log(
+        `[send-otp] OTP sent successfully for ${sendOtpDto.email}`,
+      );
       return result;
     } catch (error) {
-      this.logger.error(`[send-otp] Failed for ${sendOtpDto.email}: ${error.message}`);
+      this.logger.error(
+        `[send-otp] Failed for ${sendOtpDto.email}: ${error.message}`,
+      );
       throw error;
     }
   }
 
   /**
    * POST /auth/verify-otp
-   * 
+   *
    * **Unified OTP verification endpoint** for both registration and login flows.
-   * 
+   *
    * Verifies the 6-digit OTP sent to user's email. Automatically detects whether this is:
    * - **Registration verification:** Completes email verification, marks user EMAIL_VERIFIED, returns access+refresh tokens.
    * - **Login verification:** Completes login, returns access+refresh tokens (no status change).
-   * 
+   *
    * **Request:**
    * ```
    * POST /auth/verify-otp
    * Content-Type: application/json
-   * 
+   *
    * {
    *   "email": "user@example.com",
    *   "otp": "123456"
    * }
    * ```
-   * 
+   *
    * **Response (success - 200):**
    * ```
    * {
@@ -128,19 +132,19 @@ export class AuthController {
    *   "message": "Email verified successfully." (for registration) OR "Login successful" (for login)
    * }
    * ```
-   * 
+   *
    * **Errors:**
    * - 400 Bad Request: OTP not found, expired (>10 min), or invalid code.
    * - 400 Bad Request: OTP already failed 3 times; request new OTP.
    * - 400 Bad Request: User not found (database inconsistency).
    * - 409 Conflict: User email not verified (for login flow only).
-   * 
+   *
    * **Token Details:**
    * - Access Token: 7-day TTL; use for API requests in Authorization header.
    * - Refresh Token: 30-day TTL; use to generate new access tokens when expired.
-   * 
+   *
    * **Both tokens are issued immediately** to enable seamless authentication.
-   * 
+   *
    * @param verifyOtpDto { email, otp }
    * @returns { userId, accessToken, refreshToken, message }
    */
@@ -152,33 +156,37 @@ export class AuthController {
         verifyOtpDto.email,
         verifyOtpDto.otp,
       );
-      this.logger.log(`[verify-otp] Verified successfully for ${verifyOtpDto.email}`);
+      this.logger.log(
+        `[verify-otp] Verified successfully for ${verifyOtpDto.email}`,
+      );
       return result;
     } catch (error) {
-      this.logger.error(`[verify-otp] Failed for ${verifyOtpDto.email}: ${error.message}`);
+      this.logger.error(
+        `[verify-otp] Failed for ${verifyOtpDto.email}: ${error.message}`,
+      );
       throw error;
     }
   }
 
   /**
    * GET /auth/debug/otp?email=... (Dev Only)
-   * 
+   *
    * **Development helper endpoint** to retrieve OTP for a given email during local testing.
    * Disabled in production (throws 403 Forbidden).
-   * 
+   *
    * **Purpose:**
    * - Accelerate local testing by bypassing email delivery.
    * - Retrieve the in-memory OTP without waiting for email client.
-   * 
+   *
    * **Usage:**
    * ```bash
    * # Via query parameter
    * curl http://localhost:3000/auth/debug/otp?email=user@example.com
-   * 
+   *
    * # Via request body (httpie)
    * http POST http://localhost:3000/auth/debug/otp email=user@example.com
    * ```
-   * 
+   *
    * **Response (success - 200):**
    * ```
    * {
@@ -186,7 +194,7 @@ export class AuthController {
    *   "otp": "123456"
    * }
    * ```
-   * 
+   *
    * **Response (OTP not found - 200):**
    * ```
    * {
@@ -194,7 +202,7 @@ export class AuthController {
    *   "otp": null
    * }
    * ```
-   * 
+   *
    * **Response (production - 403):**
    * ```
    * {
@@ -202,9 +210,9 @@ export class AuthController {
    *   "statusCode": 403
    * }
    * ```
-   * 
+   *
    * **Note:** Only available when NODE_ENV !== 'production'.
-   * 
+   *
    * @param emailQuery Email from query parameter (?email=...)
    * @param body Request body (alternative input; for httpie compatibility)
    * @returns { email, otp } where otp is null if not found
@@ -220,7 +228,9 @@ export class AuthController {
     const email = emailQuery || body?.email;
 
     if (!email) {
-      throw new BadRequestException('email is required (pass as ?email=... or in body)');
+      throw new BadRequestException(
+        'email is required (pass as ?email=... or in body)',
+      );
     }
 
     const otp = this.otpService.getOtpForTesting(email);
@@ -229,27 +239,27 @@ export class AuthController {
 
   /**
    * POST /auth/login
-   * 
+   *
    * **Initiate login flow** for existing verified users.
-   * 
+   *
    * Accepts email, validates user exists and is verified, then:
    * 1. Generates and sends 6-digit OTP via email (valid for 10 minutes).
    * 2. Stores OTP in memory with purpose='login'.
-   * 
+   *
    * **Preconditions:**
    * - User must exist in database with status EMAIL_VERIFIED or higher.
    * - If user not found or not verified, returns error.
-   * 
+   *
    * **Request:**
    * ```
    * POST /auth/login
    * Content-Type: application/json
-   * 
+   *
    * {
    *   "email": "user@example.com"
    * }
    * ```
-   * 
+   *
    * **Response (success - 200):**
    * ```
    * {
@@ -257,7 +267,7 @@ export class AuthController {
    *   "status": 200
    * }
    * ```
-   * 
+   *
    * **Response (error - user not found - 404):**
    * ```
    * {
@@ -265,7 +275,7 @@ export class AuthController {
    *   "status": 404
    * }
    * ```
-   * 
+   *
    * **Response (error - email not verified - 400):**
    * ```
    * {
@@ -273,9 +283,9 @@ export class AuthController {
    *   "status": 400
    * }
    * ```
-   * 
+   *
    * **Next step:** Call POST /auth/verify-otp with email and received OTP.
-   * 
+   *
    * @param loginDto { email }
    * @returns { message, status }
    */
@@ -287,7 +297,9 @@ export class AuthController {
       this.logger.log(`[login] OTP sent for ${loginDto.email}`);
       return result;
     } catch (error) {
-      this.logger.error(`[login] Failed for ${loginDto.email}: ${error.message}`);
+      this.logger.error(
+        `[login] Failed for ${loginDto.email}: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -304,10 +316,7 @@ export class AuthController {
    */
   @Post('select-country')
   @UseGuards(JwtAuthGuard)
-  async selectCountry(
-    @Req() req,
-    @Body() countryDto: SelectCountryDto,
-  ) {
+  async selectCountry(@Req() req, @Body() countryDto: SelectCountryDto) {
     return this.authService.selectCountry(req.user.id, countryDto);
   }
 
@@ -343,7 +352,6 @@ export class AuthController {
       digilockerDto.authorizationCode,
     );
   }
-
 
   /**
    * GET /auth/verification/status
@@ -415,18 +423,17 @@ export class AuthController {
    */
   @Post('subscription/select-plan')
   @UseGuards(JwtAuthGuard)
-  async selectSubscriptionPlan(
-    @Req() req,
-    @Body() body: { planId: string },
-  ) {
+  async selectSubscriptionPlan(@Req() req, @Body() body: { planId: string }) {
     // Check if user exists
     if (!req.user.user) {
       throw new BadRequestException('User not found');
     }
-    
+
     // Check if user has completed all verification steps
     if (req.user.user.status !== 'APPROVED') {
-      throw new ForbiddenException('User must complete all verification steps before subscribing');
+      throw new ForbiddenException(
+        'User must complete all verification steps before subscribing',
+      );
     }
     return this.subscriptionService.createCheckoutSession(req.user.id, body);
   }
@@ -477,15 +484,19 @@ export class AuthController {
    */
   @Post('webhooks/cashfree')
   async handleCashfreeWebhook(@Req() req) {
-    const signature = (req.headers['x-webhook-signature'] || req.headers['x-webhook-signature'.toLowerCase()]) as string | undefined;
-    const timestamp = (req.headers['x-webhook-timestamp'] || req.headers['x-webhook-timestamp'.toLowerCase()]) as string | undefined;
+    const signature = (req.headers['x-webhook-signature'] ||
+      req.headers['x-webhook-signature'.toLowerCase()]) as string | undefined;
+    const timestamp = (req.headers['x-webhook-timestamp'] ||
+      req.headers['x-webhook-timestamp'.toLowerCase()]) as string | undefined;
     const rawBody = JSON.stringify(req.body || {});
 
     // Verify webhook signature if secret configured
     if (signature && timestamp) {
       const ok = verifyCashfreeWebhookSignature(timestamp, rawBody, signature);
       if (!ok) {
-        this.logger.warn('[webhooks/cashfree] Invalid signature, rejecting webhook');
+        this.logger.warn(
+          '[webhooks/cashfree] Invalid signature, rejecting webhook',
+        );
         return { received: false, reason: 'invalid_signature' };
       }
     }

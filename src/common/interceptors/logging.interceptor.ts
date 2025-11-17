@@ -18,45 +18,36 @@ export class LoggingInterceptor implements NestInterceptor {
     const startTime = Date.now();
 
     // Log incoming request
-    this.logger.debug(
-      `[REQUEST] ${method} ${url}`,
-      {
-        params,
-        query,
-        body: this.sanitizeBody(body),
-        userId: user?.id || 'anonymous',
-        timestamp: new Date().toISOString(),
-      },
-    );
+    this.logger.debug(`[REQUEST] ${method} ${url}`, {
+      params,
+      query,
+      body: this.sanitizeBody(body),
+      userId: user?.id || 'anonymous',
+      timestamp: new Date().toISOString(),
+    });
 
     return next.handle().pipe(
       tap((response) => {
         const duration = Date.now() - startTime;
-        this.logger.debug(
-          `[RESPONSE] ${method} ${url} - ${duration}ms`,
-          {
-            statusCode: context.switchToHttp().getResponse().statusCode,
-            response: this.truncateResponse(response),
-            userId: user?.id || 'anonymous',
-            duration,
-            timestamp: new Date().toISOString(),
-          },
-        );
+        this.logger.debug(`[RESPONSE] ${method} ${url} - ${duration}ms`, {
+          statusCode: context.switchToHttp().getResponse().statusCode,
+          response: this.truncateResponse(response),
+          userId: user?.id || 'anonymous',
+          duration,
+          timestamp: new Date().toISOString(),
+        });
       }),
       catchError((error) => {
         const duration = Date.now() - startTime;
-        this.logger.error(
-          `[ERROR] ${method} ${url} - ${duration}ms`,
-          {
-            statusCode: error.status || 500,
-            message: error.message,
-            error: error.response?.message || error.toString(),
-            userId: user?.id || 'anonymous',
-            duration,
-            stack: error.stack,
-            timestamp: new Date().toISOString(),
-          },
-        );
+        this.logger.error(`[ERROR] ${method} ${url} - ${duration}ms`, {
+          statusCode: error.status || 500,
+          message: error.message,
+          error: error.response?.message || error.toString(),
+          userId: user?.id || 'anonymous',
+          duration,
+          stack: error.stack,
+          timestamp: new Date().toISOString(),
+        });
         throw error;
       }),
     );
@@ -68,7 +59,14 @@ export class LoggingInterceptor implements NestInterceptor {
   private sanitizeBody(body: any): any {
     if (!body) return body;
     const sanitized = { ...body };
-    const sensitiveFields = ['password', 'passwordHash', 'otp', 'token', 'secret', 'apiKey'];
+    const sensitiveFields = [
+      'password',
+      'passwordHash',
+      'otp',
+      'token',
+      'secret',
+      'apiKey',
+    ];
     sensitiveFields.forEach((field) => {
       if (sanitized[field]) {
         sanitized[field] = '[REDACTED]';
@@ -83,7 +81,7 @@ export class LoggingInterceptor implements NestInterceptor {
    */
   private truncateResponse(response: any, maxLength: number = 500): any {
     if (!response) return response;
-    
+
     try {
       // Use replacer to handle circular references
       const str = JSON.stringify(response, this.getCircularReplacer());
@@ -104,10 +102,15 @@ export class LoggingInterceptor implements NestInterceptor {
     const seen = new WeakSet();
     return (key: string, value: any) => {
       // Skip request/response/socket related objects
-      if (key === 'req' || key === 'res' || key === 'socket' || key === 'connection') {
+      if (
+        key === 'req' ||
+        key === 'res' ||
+        key === 'socket' ||
+        key === 'connection'
+      ) {
         return '[Circular Reference]';
       }
-      
+
       if (typeof value === 'object' && value !== null) {
         if (seen.has(value)) {
           return '[Circular Reference]';

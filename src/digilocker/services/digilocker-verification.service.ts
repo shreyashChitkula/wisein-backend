@@ -70,7 +70,9 @@ export class DigiLockerVerificationService {
       }
 
       if (user.status !== 'EMAIL_VERIFIED') {
-        throw new BadRequestException('Please verify your email before starting ID verification');
+        throw new BadRequestException(
+          'Please verify your email before starting ID verification',
+        );
       }
 
       // if (!user.country) {
@@ -91,9 +93,10 @@ export class DigiLockerVerificationService {
       }
 
       // Check if user already has verified identity
-      const existingVerification = await this.prisma.userVerification.findUnique({
-        where: { userId },
-      });
+      const existingVerification =
+        await this.prisma.userVerification.findUnique({
+          where: { userId },
+        });
 
       if (existingVerification?.verificationStatus === 'VERIFIED') {
         return {
@@ -195,22 +198,29 @@ export class DigiLockerVerificationService {
 
     try {
       // Ensure caller is eligible for DigiLocker (India-only)
-      const caller = await this.prisma.user.findUnique({ where: { id: userId } });
+      const caller = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
       if (!caller) throw new BadRequestException('User not found');
       if (caller.country && caller.country.toLowerCase() !== 'india') {
-        this.logger.warn(`User ${userId} attempted DigiLocker completion but country is ${caller.country}`);
+        this.logger.warn(
+          `User ${userId} attempted DigiLocker completion but country is ${caller.country}`,
+        );
         throw new BadRequestException(
           'DigiLocker verification is available only for users in India. Please use Stripe verification for users outside India.',
         );
       }
 
       // Get session
-      const session = await this.prisma.digiLockerVerificationSession.findUnique({
-        where: { verificationId: dto.verificationId },
-      });
+      const session =
+        await this.prisma.digiLockerVerificationSession.findUnique({
+          where: { verificationId: dto.verificationId },
+        });
 
       if (!session || session.userId !== userId) {
-        throw new BadRequestException('Invalid verification ID or expired session');
+        throw new BadRequestException(
+          'Invalid verification ID or expired session',
+        );
       }
 
       if (session.status !== 'AUTHENTICATED') {
@@ -321,18 +331,24 @@ export class DigiLockerVerificationService {
       try {
         await this.prisma.user.update({
           where: { id: userId },
-          data: { 
+          data: {
             status: 'ID_VERIFIED',
-            country: 'India' // Set country for DigiLocker users
+            country: 'India', // Set country for DigiLocker users
           },
         });
-        this.logger.log(`User onboarding status updated to ID_VERIFIED and country set to India for user: ${userId}`);
+        this.logger.log(
+          `User onboarding status updated to ID_VERIFIED and country set to India for user: ${userId}`,
+        );
       } catch (err) {
         // Log but don't fail the whole flow if updating user status fails
-        this.logger.error(`Failed to update user status for ${userId}: ${err.message}`);
+        this.logger.error(
+          `Failed to update user status for ${userId}: ${err.message}`,
+        );
       }
 
-      this.logger.log(`Verification completed successfully for user: ${userId}`);
+      this.logger.log(
+        `Verification completed successfully for user: ${userId}`,
+      );
 
       return {
         success: true,
@@ -376,9 +392,8 @@ export class DigiLockerVerificationService {
       // AUTHENTICATED we update the DB and return the updated status.
       if (session.status === 'INITIATED' || session.status === 'PENDING') {
         try {
-          const statusResult = await this.getDigiLockerVerificationStatus(
-            verificationId,
-          );
+          const statusResult =
+            await this.getDigiLockerVerificationStatus(verificationId);
 
           if (statusResult && statusResult.status === 'AUTHENTICATED') {
             await this.prisma.digiLockerVerificationSession.update({
@@ -425,7 +440,10 @@ export class DigiLockerVerificationService {
 
     return {
       needsMigration: false,
-      verificationType: verification?.verificationStatus === 'VERIFIED' ? verification.method : null,
+      verificationType:
+        verification?.verificationStatus === 'VERIFIED'
+          ? verification.method
+          : null,
       verified: verification?.verificationStatus === 'VERIFIED' || false,
     };
   }
@@ -471,12 +489,12 @@ export class DigiLockerVerificationService {
 
     try {
       const endpoint = '/verification/digilocker';
-      
+
       // Construct redirect URI - where DigiLocker will redirect after completion
       // Default to frontend callback page, or use environment variable
       const frontendUrl = process.env.FRONTEND_URL || `http://localhost:3000`;
       const redirectUri = `${frontendUrl}/digilocker/callback?verification_id=${verificationId}`;
-      
+
       const payload = {
         verification_id: verificationId,
         document_requested: documents,
@@ -489,7 +507,9 @@ export class DigiLockerVerificationService {
       const response = await this.makeApiRequest(endpoint, 'POST', payload);
       return response;
     } catch (error) {
-      this.logger.error(`Failed to create consent URL: ${error.response?.data || error.message}`);
+      this.logger.error(
+        `Failed to create consent URL: ${error.response?.data || error.message}`,
+      );
       throw new HttpException(
         'Failed to create verification URL',
         HttpStatus.SERVICE_UNAVAILABLE,
@@ -557,14 +577,19 @@ export class DigiLockerVerificationService {
     try {
       headers['x-cf-signature'] = this.generateSignature();
     } catch (err) {
-      this.logger.error('Failed to generate signature for request:', err.message);
+      this.logger.error(
+        'Failed to generate signature for request:',
+        err.message,
+      );
     }
 
     try {
       // Debug: mask sensitive headers for logs
       const maskedHeaders = { ...headers } as Record<string, string>;
-      if (maskedHeaders['x-client-secret']) maskedHeaders['x-client-secret'] = '****';
-      if (maskedHeaders['x-cf-signature']) maskedHeaders['x-cf-signature'] = '****';
+      if (maskedHeaders['x-client-secret'])
+        maskedHeaders['x-client-secret'] = '****';
+      if (maskedHeaders['x-cf-signature'])
+        maskedHeaders['x-cf-signature'] = '****';
 
       this.logger.debug(`Outgoing Cashfree request -> ${method} ${url}`);
       this.logger.debug(`Headers: ${JSON.stringify(maskedHeaders)}`);
@@ -586,7 +611,9 @@ export class DigiLockerVerificationService {
       }
 
       this.logger.debug(`Cashfree response status: ${response.status}`);
-      this.logger.debug(`Cashfree response body: ${JSON.stringify(data).slice(0, 2000)}`);
+      this.logger.debug(
+        `Cashfree response body: ${JSON.stringify(data).slice(0, 2000)}`,
+      );
 
       if (!response.ok) {
         this.logger.error(
@@ -617,12 +644,18 @@ export class DigiLockerVerificationService {
    */
   private generateSignature(): string {
     try {
-      return getCashfreeSignature(this.clientId, process.env.CASHFREE_PUBLIC_KEY || '');
+      return getCashfreeSignature(
+        this.clientId,
+        process.env.CASHFREE_PUBLIC_KEY || '',
+      );
     } catch (error) {
-      this.logger.error('Failed to generate Cashfree signature:', error.message);
+      this.logger.error(
+        'Failed to generate Cashfree signature:',
+        error.message,
+      );
       throw new HttpException(
         'Failed to generate API signature. Check CASHFREE_PUBLIC_KEY configuration.',
-        HttpStatus.INTERNAL_SERVER_ERROR
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
@@ -643,10 +676,7 @@ export class DigiLockerVerificationService {
         digilockerData.name,
         userProvidedData.nameAsPerAadhaar,
       ),
-      dob: this.compareDate(
-        digilockerData.dob,
-        userProvidedData.dateOfBirth,
-      ),
+      dob: this.compareDate(digilockerData.dob, userProvidedData.dateOfBirth),
       gender: this.compareGender(
         digilockerData.gender,
         userProvidedData.gender,
@@ -677,7 +707,11 @@ export class DigiLockerVerificationService {
 
   private compareName(digilocker: string, userProvided: string): boolean {
     const normalize = (s: string) =>
-      s.toLowerCase().trim().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ');
+      s
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s]/g, '')
+        .replace(/\s+/g, ' ');
     return normalize(digilocker) === normalize(userProvided);
   }
 
@@ -704,7 +738,11 @@ export class DigiLockerVerificationService {
 
   private compareState(digilocker: string, userProvided: string): boolean {
     const normalize = (s: string) =>
-      s.toLowerCase().trim().replace(/[^\w\s]/g, '').replace(/\s+/g, '');
+      s
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s]/g, '')
+        .replace(/\s+/g, '');
     return normalize(digilocker) === normalize(userProvided);
   }
 

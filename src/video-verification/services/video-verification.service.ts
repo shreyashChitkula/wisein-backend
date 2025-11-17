@@ -19,12 +19,13 @@ export class VideoVerificationService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-
   async createVideoVerification(
     dto: CreateVideoVerificationDto,
     userId: string,
   ): Promise<any> {
-    this.logger.log(`Processing VideoVerification submission for user: ${userId}`);
+    this.logger.log(
+      `Processing VideoVerification submission for user: ${userId}`,
+    );
 
     const { photoUrl, videoUrl } = dto;
 
@@ -89,13 +90,15 @@ export class VideoVerificationService {
       };
     } catch (error) {
       this.logger.error(`Registration failed: ${error.message}`, error.stack);
-      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
         throw error;
       }
       throw new InternalServerErrorException('Failed to complete registration');
     }
   }
-
 
   async getVideoVerificationStatus(userId: string): Promise<any> {
     this.logger.log(`Fetching verification status for user: ${userId}`);
@@ -106,15 +109,16 @@ export class VideoVerificationService {
         select: { status: true },
       });
 
-      const videoVerification = await this.prisma.userVideoVerification.findUnique({
-        where: { userId },
-        select: {
-          photoUrl: true,
-          videoUrl: true,
-          status: true,
-          verified: true,
-        },
-      });
+      const videoVerification =
+        await this.prisma.userVideoVerification.findUnique({
+          where: { userId },
+          select: {
+            photoUrl: true,
+            videoUrl: true,
+            status: true,
+            verified: true,
+          },
+        });
 
       if (!videoVerification) {
         return {
@@ -129,10 +133,9 @@ export class VideoVerificationService {
         success: true,
         verified: videoVerification.verified,
         status: user?.status || 'ID_VERIFIED',
-        message:
-          videoVerification.verified
-            ? 'You are fully verified!'
-            : 'Verification in progress...',
+        message: videoVerification.verified
+          ? 'You are fully verified!'
+          : 'Verification in progress...',
         photoUrl: videoVerification.photoUrl,
         videoUrl: videoVerification.videoUrl,
       };

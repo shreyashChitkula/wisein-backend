@@ -4,6 +4,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MailService } from '../../shared/mail/mail.service';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -14,7 +15,10 @@ import * as path from 'path';
 export class VerificationService {
   private uploadsDir = path.join(process.cwd(), 'uploads');
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    private mailService: MailService,
+  ) {
     // Ensure uploads directory exists
     if (!fs.existsSync(this.uploadsDir)) {
       fs.mkdirSync(this.uploadsDir, { recursive: true });
@@ -79,7 +83,6 @@ export class VerificationService {
     };
   }
 
-
   /**
    * Step 4: Upload and process video
    * Extract frame from video and use as profile picture
@@ -99,7 +102,9 @@ export class VerificationService {
     // Validate file type
     const allowedMimetypes = ['video/mp4', 'video/webm', 'video/quicktime'];
     if (!allowedMimetypes.includes(videoFile.mimetype)) {
-      throw new BadRequestException('Invalid video format. Use MP4, WebM, or MOV');
+      throw new BadRequestException(
+        'Invalid video format. Use MP4, WebM, or MOV',
+      );
     }
 
     // Validate file size (max 100MB)
@@ -112,7 +117,7 @@ export class VerificationService {
       // Save video file
       const videoFilename = `video_${userId}_${Date.now()}.mp4`;
       const videoPath = path.join(this.uploadsDir, 'videos', videoFilename);
-      
+
       // Create videos directory if it doesn't exist
       const videosDir = path.join(this.uploadsDir, 'videos');
       if (!fs.existsSync(videosDir)) {
@@ -126,7 +131,7 @@ export class VerificationService {
       // For now, use a placeholder
       const frameFilename = `frame_${userId}_${Date.now()}.jpg`;
       const framePath = path.join(this.uploadsDir, 'frames', frameFilename);
-      
+
       // Create frames directory if it doesn't exist
       const framesDir = path.join(this.uploadsDir, 'frames');
       if (!fs.existsSync(framesDir)) {
@@ -167,13 +172,31 @@ export class VerificationService {
         },
       });
 
+      // Send verification pending email
+      try {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+        });
+        if (user?.email) {
+          await this.mailService.sendVerificationPending(
+            user.email,
+            user.name || undefined,
+          );
+        }
+      } catch (emailError) {
+        // Log error but don't fail the verification process
+        console.error('Failed to send verification pending email:', emailError);
+      }
+
       return {
         videoUrl,
         frameUrl,
         message: 'Video uploaded and processed successfully',
       };
     } catch (error) {
-      throw new BadRequestException(`Video processing failed: ${error.message}`);
+      throw new BadRequestException(
+        `Video processing failed: ${error.message}`,
+      );
     }
   }
 

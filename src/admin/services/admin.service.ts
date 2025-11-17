@@ -1,11 +1,20 @@
-import { Injectable, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MailService } from '../../shared/mail/mail.service';
 
 @Injectable()
 export class AdminService {
   private readonly logger = new Logger(AdminService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private mailService: MailService,
+  ) {}
 
   /**
    * Verify that user has admin access
@@ -97,7 +106,9 @@ export class AdminService {
   /**
    * Approve user - move to APPROVED status
    */
-  async approveUser(userId: string, notes?: string): Promise<{
+  async approveUser(
+    userId: string,
+  ): Promise<{
     message: string;
     userId: string;
     status: string;
@@ -122,8 +133,21 @@ export class AdminService {
       data: { status: 'APPROVED' },
     });
 
-    // TODO: Send approval email to user
-    // await this.emailService.sendApprovalEmail(user.email);
+    // Send approval emails
+    try {
+      if (updatedUser.email) {
+        await this.mailService.sendVerificationApproved(
+          updatedUser.email,
+          updatedUser.name || undefined,
+        );
+        await this.mailService.sendFinalWelcome(
+          updatedUser.email,
+          updatedUser.name || undefined,
+        );
+      }
+    } catch (emailError) {
+      this.logger.error('Failed to send approval emails', emailError);
+    }
 
     return {
       message: 'User approved successfully',
@@ -135,7 +159,10 @@ export class AdminService {
   /**
    * Reject user - revert to REGISTERED status
    */
-  async rejectUser(userId: string, reason: string): Promise<{
+  async rejectUser(
+    userId: string,
+    reason: string,
+  ): Promise<{
     message: string;
     userId: string;
   }> {
@@ -168,8 +195,18 @@ export class AdminService {
       data: { status: 'REGISTERED' },
     });
 
-    // TODO: Send rejection email to user with reason
-    // await this.emailService.sendRejectionEmail(user.email, reason);
+    // Send rejection email
+    try {
+      if (user.email) {
+        await this.mailService.sendVerificationRejected(
+          user.email,
+          user.name || undefined,
+          reason,
+        );
+      }
+    } catch (emailError) {
+      this.logger.error('Failed to send rejection email', emailError);
+    }
 
     return {
       message: 'User rejected and can reapply after fixing issues',
@@ -207,7 +244,9 @@ export class AdminService {
       where: { status: { not: 'REGISTERED' } },
     });
     const idVerified = await this.prisma.user.count({
-      where: { status: { in: ['ID_VERIFIED', 'VIDEO_VERIFIED', 'APPROVED', 'ACTIVE'] } },
+      where: {
+        status: { in: ['ID_VERIFIED', 'VIDEO_VERIFIED', 'APPROVED', 'ACTIVE'] },
+      },
     });
     const videoVerified = await this.prisma.user.count({
       where: { status: { in: ['VIDEO_VERIFIED', 'APPROVED', 'ACTIVE'] } },
@@ -217,11 +256,18 @@ export class AdminService {
     });
 
     const conversionRates = {
-      emailVerification: totalUsers > 0 ? ((emailVerified / totalUsers) * 100).toFixed(2) : '0',
-      idVerification: emailVerified > 0 ? ((idVerified / emailVerified) * 100).toFixed(2) : '0',
-      videoVerification: idVerified > 0 ? ((videoVerified / idVerified) * 100).toFixed(2) : '0',
-      adminApproval: videoVerified > 0 ? ((approved / videoVerified) * 100).toFixed(2) : '0',
-      finalActivation: approved > 0 ? ((activeUsers / approved) * 100).toFixed(2) : '0',
+      emailVerification:
+        totalUsers > 0 ? ((emailVerified / totalUsers) * 100).toFixed(2) : '0',
+      idVerification:
+        emailVerified > 0
+          ? ((idVerified / emailVerified) * 100).toFixed(2)
+          : '0',
+      videoVerification:
+        idVerified > 0 ? ((videoVerified / idVerified) * 100).toFixed(2) : '0',
+      adminApproval:
+        videoVerified > 0 ? ((approved / videoVerified) * 100).toFixed(2) : '0',
+      finalActivation:
+        approved > 0 ? ((activeUsers / approved) * 100).toFixed(2) : '0',
     };
 
     // Calculate total revenue from active subscriptions

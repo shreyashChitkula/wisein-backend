@@ -1,4 +1,16 @@
-import { Controller, Post, Body, Get, Param, Headers, Req, HttpCode, HttpStatus, Logger, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  Headers,
+  Req,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  UseGuards,
+} from '@nestjs/common';
 import { PaymentService } from './payment.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
@@ -9,21 +21,27 @@ export class PaymentController {
 
   @Post('order')
   @UseGuards(JwtAuthGuard)
-  async createOrder(@Req() req: any, @Body() body: { amount: number; currency?: string; phone?: string }) {
+  async createOrder(
+    @Req() req: any,
+    @Body() body: { amount: number; currency?: string; phone?: string },
+  ) {
     const userId = req.user?.id;
     if (!userId) {
       return { success: false, message: 'User not authenticated' };
     }
     const { amount, currency = 'INR', phone } = body;
-    return this.paymentService.createPaymentOrder(userId, amount, currency, phone);
+    return this.paymentService.createPaymentOrder(
+      userId,
+      amount,
+      currency,
+      phone,
+    );
   }
-
 
   @Get('status/:orderId')
   async getStatus(@Param('orderId') orderId: string) {
     return this.paymentService.getPaymentStatus(orderId);
   }
-
 
   @Get('history/:userId')
   @UseGuards(JwtAuthGuard)
@@ -36,13 +54,27 @@ export class PaymentController {
   @HttpCode(HttpStatus.OK)
   async webhook(@Req() req: any, @Headers() headers: any) {
     // Cashfree sends a timestamp and signature headers; accept multiple possible header names
-    const signature = headers['x-cf-webhook-signature'] || headers['x-webhook-signature'] || headers['x-cf-signature'] || headers['signature'];
-    const timestamp = headers['x-cf-webhook-timestamp'] || headers['x-timestamp'] || headers['timestamp'] || '';
+    const signature =
+      headers['x-cf-webhook-signature'] ||
+      headers['x-webhook-signature'] ||
+      headers['x-cf-signature'] ||
+      headers['signature'];
+    const timestamp =
+      headers['x-cf-webhook-timestamp'] ||
+      headers['x-timestamp'] ||
+      headers['timestamp'] ||
+      '';
 
     // raw body might be available as req.rawBody; fallback to stringified body
-    const rawBody = req.rawBody ? req.rawBody.toString() : JSON.stringify(req.body || {});
+    const rawBody = req.rawBody
+      ? req.rawBody.toString()
+      : JSON.stringify(req.body || {});
 
-    const verified = this.paymentService.verifyWebhookSignature(timestamp, rawBody, signature);
+    const verified = this.paymentService.verifyWebhookSignature(
+      timestamp,
+      rawBody,
+      signature,
+    );
 
     if (!verified) {
       this.logger.warn('Received webhook with invalid signature');
@@ -51,7 +83,7 @@ export class PaymentController {
 
     // Process webhook payload
     const result = await this.paymentService.processWebhookEvent(req.body);
-    
+
     this.logger.log(`Webhook processed: ${JSON.stringify(result)}`);
 
     return { success: true, result };
@@ -60,14 +92,20 @@ export class PaymentController {
   // Development endpoint to manually complete subscription (for testing when webhooks don't fire)
   @Post('complete-subscription/:orderId')
   @UseGuards(JwtAuthGuard)
-  async completeSubscription(@Param('orderId') orderId: string, @Req() req: any) {
+  async completeSubscription(
+    @Param('orderId') orderId: string,
+    @Req() req: any,
+  ) {
     try {
       // Only allow in development
       if (process.env.NODE_ENV === 'production') {
         return { success: false, message: 'Not available in production' };
       }
 
-      const result = await this.paymentService.completeSubscriptionManually(orderId, req.user.id);
+      const result = await this.paymentService.completeSubscriptionManually(
+        orderId,
+        req.user.id,
+      );
       return { success: true, result };
     } catch (error) {
       this.logger.error('Error completing subscription manually:', error);

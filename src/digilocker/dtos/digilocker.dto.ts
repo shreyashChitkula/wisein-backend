@@ -1,4 +1,11 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum, IsDateString, Matches } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsEnum,
+  IsDateString,
+  Matches,
+} from 'class-validator';
 
 /**
  * DigiLocker Verification DTOs
@@ -8,12 +15,12 @@ import { IsString, IsNotEmpty, IsOptional, IsEnum, IsDateString, Matches } from 
 export enum DocumentType {
   AADHAAR = 'AADHAAR',
   PAN = 'PAN',
-  DRIVING_LICENSE = 'DRIVING_LICENSE'
+  DRIVING_LICENSE = 'DRIVING_LICENSE',
 }
 
 export enum UserFlow {
   SIGNIN = 'signin',
-  SIGNUP = 'signup'
+  SIGNUP = 'signup',
 }
 
 export enum VerificationStatus {
@@ -22,7 +29,7 @@ export enum VerificationStatus {
   PENDING = 'PENDING',
   EXPIRED = 'EXPIRED',
   CONSENT_DENIED = 'CONSENT_DENIED',
-  SUCCESS = 'SUCCESS'
+  SUCCESS = 'SUCCESS',
 }
 
 /**
@@ -48,7 +55,7 @@ export class InitiateDigiLockerDto {
   @IsString()
   @IsNotEmpty()
   @Matches(/^[0-9]{10}$/, {
-    message: 'Mobile number must be 10 digits'
+    message: 'Mobile number must be 10 digits',
   })
   mobileNumber: string;
 }

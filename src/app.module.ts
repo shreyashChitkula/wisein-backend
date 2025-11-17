@@ -12,7 +12,14 @@ import { LoggingInterceptor } from './common/interceptors';
 import { PaymentModule } from './payment/payment.module';
 
 @Module({
-  imports: [AuthModule, AdminModule, DigiLockerModule, VideoVerificationModule, StripeVerificationModule, PaymentModule],
+  imports: [
+    AuthModule,
+    AdminModule,
+    DigiLockerModule,
+    VideoVerificationModule,
+    StripeVerificationModule,
+    PaymentModule,
+  ],
   controllers: [AppController],
   providers: [
     AppService,

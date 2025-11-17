@@ -24,15 +24,17 @@ export class AdminController {
    * Get all users pending admin approval
    */
   @Get('users/pending')
-  async getPendingUsers(
-    @Req() req,
-  ) {
-    this.logger.log(`[getPendingUsers] Admin ${req.user.id} fetching pending users`);
+  async getPendingUsers(@Req() req) {
+    this.logger.log(
+      `[getPendingUsers] Admin ${req.user.id} fetching pending users`,
+    );
     try {
       // Verify user is admin
       await this.adminService.verifyAdminAccess(req.user.id);
       const users = await this.adminService.getPendingUsers();
-      this.logger.log(`[getPendingUsers] Fetched ${users.length} pending users`);
+      this.logger.log(
+        `[getPendingUsers] Fetched ${users.length} pending users`,
+      );
       return users;
     } catch (error) {
       this.logger.error(`[getPendingUsers] Failed: ${error.message}`);
@@ -45,10 +47,7 @@ export class AdminController {
    * Get specific user's full verification details
    */
   @Get('users/:id')
-  async getUserDetails(
-    @Req() req,
-    @Param('id') userId: string,
-  ) {
+  async getUserDetails(@Req() req, @Param('id') userId: string) {
     // Verify user is admin
     await this.adminService.verifyAdminAccess(req.user.id);
     return this.adminService.getUserDetails(userId);
@@ -66,7 +65,7 @@ export class AdminController {
   ) {
     // Verify user is admin
     await this.adminService.verifyAdminAccess(req.user.id);
-    return this.adminService.approveUser(userId, body.notes);
+    return this.adminService.approveUser(userId);
   }
 
   /**
@@ -92,15 +91,17 @@ export class AdminController {
    * Get dashboard statistics
    */
   @Get('dashboard/stats')
-  async getDashboardStats(
-    @Req() req,
-  ) {
-    this.logger.log(`[getDashboardStats] Admin ${req.user.id} requesting dashboard stats`);
+  async getDashboardStats(@Req() req) {
+    this.logger.log(
+      `[getDashboardStats] Admin ${req.user.id} requesting dashboard stats`,
+    );
     try {
       // Verify user is admin
       await this.adminService.verifyAdminAccess(req.user.id);
       const stats = await this.adminService.getDashboardStats();
-      this.logger.log(`[getDashboardStats] Dashboard stats retrieved successfully`);
+      this.logger.log(
+        `[getDashboardStats] Dashboard stats retrieved successfully`,
+      );
       return stats;
     } catch (error) {
       this.logger.error(`[getDashboardStats] Failed: ${error.message}`);

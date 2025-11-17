@@ -1,23 +1,48 @@
-import { Injectable, Logger, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import axios from 'axios';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { MailService } from '../shared/mail/mail.service';
 
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
   private apiKey = process.env.CASHFREE_API_KEY_PAYMENT || '';
   private apiSecret = process.env.CASHFREE_API_SECRET_PAYMENT || '';
-  private baseUrl = process.env.CASHFREE_BASE_URL_PAYMENT || 'https://sandbox.cashfree.com/pg';
+  private baseUrl =
+    process.env.CASHFREE_BASE_URL_PAYMENT || 'https://sandbox.cashfree.com/pg';
   private apiVersion = '2022-09-01';
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
+  ) {}
 
-  async createPaymentOrder(userId: string, amount: number, currency = 'INR', customerPhone?: string, subscriptionOptions?: { isSubscription: boolean; planId?: string; planType?: string; planName?: string }) {
-  // Debug: Print Cashfree credentials and endpoint
-  this.logger.log(`CASHFREE_API_KEY_PAYMENT: ${this.apiKey?.substring(0, 8)}...`);
-  this.logger.log(`CASHFREE_API_SECRET_PAYMENT: ${this.apiSecret?.substring(0, 8)}...`);
-  this.logger.log(`CASHFREE_BASE_URL_PAYMENT: ${this.baseUrl}`);
+  async createPaymentOrder(
+    userId: string,
+    amount: number,
+    currency = 'INR',
+    customerPhone?: string,
+    subscriptionOptions?: {
+      isSubscription: boolean;
+      planId?: string;
+      planType?: string;
+      planName?: string;
+    },
+  ) {
+    // Debug: Print Cashfree credentials and endpoint
+    this.logger.log(
+      `CASHFREE_API_KEY_PAYMENT: ${this.apiKey?.substring(0, 8)}...`,
+    );
+    this.logger.log(
+      `CASHFREE_API_SECRET_PAYMENT: ${this.apiSecret?.substring(0, 8)}...`,
+    );
+    this.logger.log(`CASHFREE_BASE_URL_PAYMENT: ${this.baseUrl}`);
     try {
       // Ensure user has completed video verification before creating an order
       // const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -40,15 +65,21 @@ export class PaymentService {
           customer_name: 'Test Customer',
         },
         order_meta: {
-          return_url: process.env.CASHFREE_ENV_PAYMENT === 'production'
-            ? `${process.env.FRONTEND_URL}/payment/success?order_id={order_id}`
-            : `http://localhost:${process.env.PORT || 3000}/payment/success?order_id={order_id}`,
-          notify_url: process.env.CASHFREE_ENV_PAYMENT === 'production' ? `${process.env.API_URL || 'https://wisein.in'}/api/payment/webhook` : undefined,
+          return_url:
+            process.env.CASHFREE_ENV_PAYMENT === 'production'
+              ? `${process.env.FRONTEND_URL}/payment/success?order_id={order_id}`
+              : `http://localhost:${process.env.PORT || 3000}/payment/success?order_id={order_id}`,
+          notify_url:
+            process.env.CASHFREE_ENV_PAYMENT === 'production'
+              ? `${process.env.API_URL || 'https://wisein.in'}/api/payment/webhook`
+              : undefined,
         },
         order_note: 'Payment from backend',
       };
 
-      this.logger.log(`Creating Cashfree order: ${orderId} for user: ${userId}`);
+      this.logger.log(
+        `Creating Cashfree order: ${orderId} for user: ${userId}`,
+      );
       const resp = await axios.post(`${this.baseUrl}/orders`, orderData, {
         headers: {
           'Content-Type': 'application/json',
@@ -59,26 +90,31 @@ export class PaymentService {
       });
 
       const data = resp.data || {};
-      
+
       // Extract payment_session_id - this is requcired to construct the payment URL
       const paymentSessionId = data.payment_session_id;
-      
+
       if (!paymentSessionId) {
-        this.logger.error('No payment_session_id in Cashfree response', JSON.stringify(data, null, 2));
-        throw new BadRequestException('Failed to create payment session: No payment_session_id in response');
+        this.logger.error(
+          'No payment_session_id in Cashfree response',
+          JSON.stringify(data, null, 2),
+        );
+        throw new BadRequestException(
+          'Failed to create payment session: No payment_session_id in response',
+        );
       }
 
       // IMPORTANT: data.payments.url is an API endpoint, NOT a payment page URL
       // We must construct the payment URL from payment_session_id
       // Format: https://payments-test.cashfree.com/order/#{payment_session_id}
       const isProduction = process.env.CASHFREE_ENV_PAYMENT === 'production';
-      const paymentBaseUrl = isProduction 
+      const paymentBaseUrl = isProduction
         ? 'https://payments.cashfree.com/order'
         : 'https://payments-test.cashfree.com/order';
-      
+
       // Construct the payment URL with the session ID
       const paymentUrl = `${paymentBaseUrl}/#${paymentSessionId}`;
-      
+
       this.logger.log(`Payment URL: ${paymentUrl}`);
       this.logger.log(`Payment Session ID: ${paymentSessionId}`);
 
@@ -108,7 +144,10 @@ export class PaymentService {
         data: data,
       };
     } catch (error) {
-      this.logger.error('createPaymentOrder error', error?.response?.data || error.message);
+      this.logger.error(
+        'createPaymentOrder error',
+        error?.response?.data || error.message,
+      );
       throw error;
     }
   }
@@ -125,7 +164,9 @@ export class PaymentService {
         return { processed: false };
       }
 
-      this.logger.log(`Processing webhook for order ${order_id}, status: ${payment_status}`);
+      this.logger.log(
+        `Processing webhook for order ${order_id}, status: ${payment_status}`,
+      );
 
       // Update the order status in the database
       if (payment_status === 'SUCCESS') {
@@ -158,11 +199,51 @@ export class PaymentService {
             },
           });
 
+          // Send payment success emails
+          try {
+            const user = await this.prisma.user.findUnique({
+              where: { id: order.userId },
+            });
+            if (user?.email) {
+              const amount = `${order.currency} ${order.amount}`;
+              const date = new Date().toLocaleDateString();
+              const transactionId = order_id;
+
+              await this.mailService.sendPaymentCompleted(
+                user.email,
+                user.name || undefined,
+                amount,
+                date,
+                transactionId,
+              );
+              await this.mailService.sendPaymentSuccessful(
+                user.email,
+                user.name || undefined,
+                amount,
+                date,
+                transactionId,
+              );
+            }
+          } catch (emailError) {
+            this.logger.error(
+              'Failed to send payment success emails',
+              emailError,
+            );
+          }
+
           // If this is a subscription payment, activate the subscription
-          if (order.isSubscription && order.planId && order.planType && order.planName) {
+          if (
+            order.isSubscription &&
+            order.planId &&
+            order.planType &&
+            order.planName
+          ) {
             const endDate = new Date();
             // Calculate end date based on plan (yearly vs monthly)
-            if (order.planId.includes('yearly') || order.planId.includes('year')) {
+            if (
+              order.planId.includes('yearly') ||
+              order.planId.includes('year')
+            ) {
               endDate.setFullYear(endDate.getFullYear() + 1);
             } else {
               endDate.setMonth(endDate.getMonth() + 1);
@@ -205,6 +286,26 @@ export class PaymentService {
           where: { orderId: order_id },
           data: { status: 'FAILED', updatedAt: new Date() },
         });
+
+        // Send payment retry email
+        try {
+          const order = await this.prisma.paymentOrder.findUnique({
+            where: { orderId: order_id },
+          });
+          if (order) {
+            const user = await this.prisma.user.findUnique({
+              where: { id: order.userId },
+            });
+            if (user?.email) {
+              await this.mailService.sendPaymentRetry(
+                user.email,
+                user.name || undefined,
+              );
+            }
+          }
+        } catch (emailError) {
+          this.logger.error('Failed to send payment retry email', emailError);
+        }
       }
 
       return { processed: true, orderId: order_id };
@@ -214,13 +315,19 @@ export class PaymentService {
     }
   }
 
-
-  verifyWebhookSignature(timestamp: string, rawBody: string, signature: string) {
+  verifyWebhookSignature(
+    timestamp: string,
+    rawBody: string,
+    signature: string,
+  ) {
     try {
       const webhookSecret = process.env.CASHFREE_WEBHOOK_SECRET || '';
       if (!webhookSecret) return false;
       const signatureData = `${timestamp}${rawBody}`;
-      const computed = crypto.createHmac('sha256', webhookSecret).update(signatureData).digest('base64');
+      const computed = crypto
+        .createHmac('sha256', webhookSecret)
+        .update(signatureData)
+        .digest('base64');
       return computed === signature;
     } catch (err) {
       this.logger.error('verifyWebhookSignature error', err.message);
@@ -239,11 +346,13 @@ export class PaymentService {
       });
       return { success: true, status: resp.data.order_status, data: resp.data };
     } catch (error) {
-      this.logger.error('getPaymentStatus error', error?.response?.data || error.message);
+      this.logger.error(
+        'getPaymentStatus error',
+        error?.response?.data || error.message,
+      );
       throw error;
     }
   }
-
 
   /**
    * Get user's payment history
@@ -300,7 +409,10 @@ export class PaymentService {
       });
 
       if (existingSubscription) {
-        return { message: 'Subscription already exists', subscription: existingSubscription };
+        return {
+          message: 'Subscription already exists',
+          subscription: existingSubscription,
+        };
       }
 
       // Create the subscription
